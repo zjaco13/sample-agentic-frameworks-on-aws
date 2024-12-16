@@ -1,5 +1,5 @@
-## 3P Agent Frameworks
-![3p-agent-frameworks](assets/3p-agent-frameworks.png)
+## 3P Agentic Frameworks
+![3p-agent-frameworks](assets/3p-agentic-frameworks.png)
 This repository provides examples and reference architectures for building autonomous agents using popular frameworks like LangChain, CrewAI, and LlamaIndex on AWS services. These examples demonstrate how to leverage AWS services to create production-ready agent applications for various industry verticals.
 
 ## Contributing
