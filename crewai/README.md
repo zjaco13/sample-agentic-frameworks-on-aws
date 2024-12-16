@@ -1,17 +1,19 @@
 ## CrewAI 
-![3p-agent-frameworks](assets/crewai-aws.png)
+![3p-agentic-frameworks](assets/crewai-aws.png)
 
 CrewAI, a Python-based open-source framework, simplifies the creation and management of multi-agent systems, enabling agents to work together seamlessly, tackling complex tasks through collaborative intelligence.
 
 ## CrewAI Official Documentation
 
-Docs: https://docs.crewai.com/introduction 
+**Docs:** https://docs.crewai.com/introduction 
 
 ## CrewAI + AWS
 
-# Importing LLMs from Amazon Bedrock
+### Importing LLMs from Amazon Bedrock
 
-Model ID: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+**Model IDs Supported:** https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+
+**LLM Configuration:** 
 
 ```
 AWS_ACCESS_KEY_ID=<your-access-key>
