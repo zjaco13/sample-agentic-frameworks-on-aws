@@ -6,7 +6,7 @@ Welcome to the AWS Infrastructure Security Audit And Reporting Crew project, pow
 
 ### Python Version Requirements
 
-CrewAI requires Python >=3.10 and <=3.12. Here's how to check your version:
+CrewAI requires Python >=3.10 and <3.13. Here's how to check your version:
 
 ```bash
 python3 --version
@@ -46,11 +46,11 @@ pip freeze | grep crewai
 ### Project Setup
 
 1. Clone this repository
-2. Add your `OPENAI_API_KEY` to the `.env` file
-3. Install project dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. Set up your environment variables (see Environment Variables section below)
+3. Install dependencies with:
+    ```bash
+    crewai install
+    ```
 
 ### Customizing
 ### Environment Variables
@@ -58,12 +58,22 @@ pip install -r requirements.txt
 Create a `.env` file in the root directory with the following required variables:
 
 ```env
+# AWS Credentials for Bedrock
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION_NAME=your_aws_region
-SERPER_API_KEY=your_serper_key
-MODEL=bedrock/anthropic.claude-3-sonnet-20240229-v1:0
+AWS_REGION_NAME=your_region
+MODEL=bedrock/anthropic.claude-3-sonnet-20240229-v1:0  # Or your preferred Bedrock model
+SERPER_API_KEY=your_serper_api_key # Serper API key for research
 ```
+
+#### AWS Bedrock Setup
+1. Ensure you have access to AWS Bedrock in your AWS account
+2. Your AWS credentials must have permissions to invoke Bedrock models
+3. The specified AWS region must have Bedrock available
+4. The model specified in `MODEL` must be enabled in your Bedrock console
+
+### Supported Models
+- See [AWS Bedrock documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids-arns.html) for more models
 
 ### Configuration Files
 - Modify `src/aws_infrastructure_security_audit_and_reporting/config/agents.yaml` to define your agents
