@@ -26,3 +26,4 @@ AWS_DEFAULT_REGION=<your-region>
 llm = LLM(
     model="bedrock/{model-id}"
 )
+```
