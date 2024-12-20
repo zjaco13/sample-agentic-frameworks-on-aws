@@ -1,4 +1,4 @@
-from crewai import Agent, Crew, Process, Task, LLM, llm
+from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 
 from aws_infrastructure_security_audit_and_reporting.tools.aws_infrastructure_scanner_tool import AWSInfrastructureScannerTool

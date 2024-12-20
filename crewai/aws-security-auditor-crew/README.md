@@ -55,7 +55,13 @@ pip freeze | grep crewai
 ### Customizing
 ### Environment Variables
 
-Create a `.env` file in the root directory with the following required variables:
+A `.env.example` file is provided in the root directory as a template. Copy this file to create your own `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Then edit the `.env` file with your actual credentials. The following variables are required:
 
 ```env
 # AWS Credentials for Bedrock
@@ -66,7 +72,9 @@ MODEL=bedrock/anthropic.claude-3-sonnet-20240229-v1:0  # Or your preferred Bedro
 SERPER_API_KEY=your_serper_api_key # Serper API key for research
 ```
 
-#### AWS Bedrock Setup
+> **Security Note**: Never commit your actual `.env` file to version control. The `.env` file is already included in `.gitignore` to prevent accidental commits of sensitive information.
+
+### AWS Bedrock Setup
 1. Ensure you have access to AWS Bedrock in your AWS account
 2. Your AWS credentials must have permissions to invoke Bedrock models
 3. The specified AWS region must have Bedrock available
