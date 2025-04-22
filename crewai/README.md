@@ -12,6 +12,9 @@ CrewAI, a Python-based open-source framework, simplifies the creation and manage
 ### [AWS Security Auditor Crew](aws-security-auditor-crew)
 A specialized crew that performs comprehensive security audits of AWS infrastructure, analyzes configurations, and generates detailed reports using Claude 3 Sonnet via Amazon Bedrock.
 
+### [Compliance Assistant Crew](https://github.com/aws-samples/sample-compliance-assistant-with-agents)
+A dedicated crew that automates compliance tasks by monitoring regulatory changes from Amazon Bedrock Knowledge Bases, generating policies, and generating technical controls using Amazon Nova Pro via Amazon Bedrock.
+
 ### Importing LLMs from Amazon Bedrock
 
 **Model IDs Supported:** https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
