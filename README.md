@@ -13,6 +13,7 @@ This repository provides examples and reference architectures for building auton
 ## Table of Contents
 - [Examples](#examples)
 - [AWS Blogs](#Blogs)
+- [Workshops](#Workshops)
 
 ## Examples
 - [🛡️ AWS Infrastructure Security Audit And Reporting Crew](https://github.com/aws-samples/3P-Agentic-Frameworks/tree/main/crewai/aws-security-auditor-crew)
@@ -28,6 +29,10 @@ This repository provides examples and reference architectures for building auton
 - [🧑‍🤝‍🧑 Build a Multi-Agent System with LangGraph and Mistral on AWS](https://aws.amazon.com/blogs/machine-learning/build-a-multi-agent-system-with-langgraph-and-mistral-on-aws/)
 - [🤝 Build multi-agent systems with LangGraph and Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/build-multi-agent-systems-with-langgraph-and-amazon-bedrock/)
 - [📜 Automating regulatory compliance: A multi-agent solution using Amazon Bedrock and CrewAI](https://aws.amazon.com/blogs/machine-learning/automating-regulatory-compliance-a-multi-agent-solution-using-amazon-bedrock-and-crewai/)
+
+## Workshops
+- [LangGraph Agents with Amazon Bedrock](https://github.com/aws-samples/langgraph-agents-with-amazon-bedrock)
+- [Building Effective AI Agents on Amazon Web Services](https://catalog.workshops.aws/building-effective-ai-agents-on-aws/en-US)
 
 ## Contributing
 We welcome contributions! Please read our Contributing Guidelines for details on how to submit pull requests, report issues, and contribute to the project.
