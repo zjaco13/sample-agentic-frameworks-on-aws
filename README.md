@@ -1,6 +1,6 @@
 ## 3P Agentic Frameworks
 
-[![Open Issues](https://img.shields.io/github/issues-raw/langchain-ai/langgraph)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
+[![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
 [![GitHub stars](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
 
 
