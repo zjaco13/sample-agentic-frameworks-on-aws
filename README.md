@@ -1,6 +1,33 @@
 ## 3P Agentic Frameworks
-![3p-agent-frameworks](assets/3p-agentic-frameworks.png)
-This repository provides examples and reference architectures for building autonomous agents using popular frameworks like LangChain, CrewAI, and LlamaIndex on AWS services. These examples demonstrate how to leverage AWS services to create production-ready agent applications for various industry verticals.
+
+[![Open Issues](https://img.shields.io/github/issues-raw/langchain-ai/langgraph)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
+[![GitHub stars](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
+
+
+<p align="center">
+  <img src="assets/3p-agentic-frameworks-new.png" alt="Project banner" width="1000">
+</p>
+
+This repository provides examples and reference architectures for building autonomous agents using popular frameworks like LangGraph, CrewAI, and LlamaIndex on AWS services. These examples demonstrate how to leverage AWS services to create production-ready agent applications for various industry verticals.
+
+## Table of Contents
+- [Examples](#examples)
+- [AWS Blogs](#Blogs)
+
+## Examples
+- [🛡️ AWS Infrastructure Security Audit And Reporting Crew](https://github.com/aws-samples/3P-Agentic-Frameworks/tree/main/crewai/aws-security-auditor-crew)
+- [🤖 Automate Customer Support with Amazon Bedrock, LangGraph and Mistral models](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Customer_Support_Automation_with_Bedrock_and_LangGraph.ipynb)
+- [🤝 Multi-Agent Collaboration and Orchestration using LangGraph for Mistral Models](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Multi_Agent_LangGraph_Mistral.ipynb)
+- [🔀 Mistral-AWS ecosystem LLM router - ReAct Agent with LangChain](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Mistral-AWS-ecosystem-LLM-router.ipynb)
+- [👀 Vision QA Agent with Mistral and LlamaIndex](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/llamaindex/Vision_QA_Agent_with_Mistral_and_LlamaIndex.ipynb)
+
+## AWS Blogs 
+- [🛠️ Build agentic systems with CrewAI and Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/build-agentic-systems-with-crewai-and-amazon-bedrock/)
+- [🤖 Build agentic AI solutions with DeepSeek-R1, CrewAI, and Amazon SageMaker AI](https://aws.amazon.com/blogs/machine-learning/build-agentic-ai-solutions-with-deepseek-r1-crewai-and-amazon-sagemaker-ai/)
+- [🔌 Extend large language models powered by Amazon SageMaker AI using Model Context Protocol](https://aws.amazon.com/blogs/machine-learning/extend-large-language-models-powered-by-amazon-sagemaker-ai-using-model-context-protocol/)
+- [🧑‍🤝‍🧑 Build a Multi-Agent System with LangGraph and Mistral on AWS](https://aws.amazon.com/blogs/machine-learning/build-a-multi-agent-system-with-langgraph-and-mistral-on-aws/)
+- [🤝 Build multi-agent systems with LangGraph and Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/build-multi-agent-systems-with-langgraph-and-amazon-bedrock/)
+- [📜 Automating regulatory compliance: A multi-agent solution using Amazon Bedrock and CrewAI](https://aws.amazon.com/blogs/machine-learning/automating-regulatory-compliance-a-multi-agent-solution-using-amazon-bedrock-and-crewai/)
 
 ## Contributing
 We welcome contributions! Please read our Contributing Guidelines for details on how to submit pull requests, report issues, and contribute to the project.
