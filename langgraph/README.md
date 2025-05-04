@@ -1,35 +1,47 @@
-## LangChain
-![3p-agentic-frameworks](assets/langchain-aws.png)
+## LangGraph
+![3p-agentic-frameworks](assets/langgraph-aws.png)
 
-LangChain is a framework that helps facilitate the integration of large language models (LLMs) into applications. 
+LangGraph is a low-level orchestration framework for building controllable agents. While langchain provides integrations and composable components to streamline LLM application development, the LangGraph library enables agent orchestration — offering customizable architectures, long-term memory, and human-in-the-loop to reliably handle complex tasks.
 
-## LangChain Official Documentation
+## LangGraph Official Documentation
 
-**Docs:** https://python.langchain.com/docs/introduction/
+**Docs:** https://langchain-ai.github.io/langgraph/tutorials/introduction/
 
-## LangChain + AWS
+## LangGraph + AWS
 
 ### Importing LLMs from Amazon Bedrock
 
-**Model IDs Supported:** https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+**Model IDs Supported in Amazon Bedrock:** https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
 
 **LLM Configuration:** 
-Boto3:
+
+Using Bedrock Endpoint (boto3):
 ```
-from langchain_aws import BedrockLLM
+from langchain_aws import ChatBedrockConverse 
+from langchain_aws import ChatBedrock
 
-llm = BedrockLLM(
-    credentials_profile_name="bedrock-admin", model_id="amazon.titan-text-express-v1"
-)
+bedrock_client = boto3.client("bedrock-runtime", region_name="<region_name>")
 
-custom_llm = BedrockLLM(
-    credentials_profile_name="bedrock-admin",
-    provider="cohere",
-    model_id="<Custom model ARN>",  # ARN like 'arn:aws:bedrock:...' obtained via provisioning the custom model
-    model_kwargs={"temperature": 1},
-    streaming=True,
-)
+llm = ChatBedrockConverse(
+        model="anthropic.claude-3-haiku-20240307-v1:0",
+        temperature=0,
+        max_tokens=None,
+        client=bedrock_client,
+        # other params...
+    )
 
-custom_llm.invoke(input="What is the recipe of mayonnaise?")
+llm.invoke(input="What is the recipe of mayonnaise?")
 
+```
+
+Using Sagemaker Endpoint
+```
+from langchain_community.llms import SagemakerEndpoint
+
+llm=SagemakerEndpoint(
+        endpoint_name=endpoint_name,
+        region_name="us-east-1",
+        model_kwargs={"max_new_tokens": 500, "do_sample": True, "temperature": 0.001}, #extending the max_tokens is VITAL, as the response will otherwise be cut, breaking the agent functionality by not giving it access to the LLM's full answer. The value has been picked empirically
+        content_handler=content_handler
+    )
 ```

@@ -1,12 +1,12 @@
 ## 3P Agentic Frameworks
 
-[![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
-[![GitHub stars](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
-
-
 <p align="center">
   <img src="assets/3p-agentic-frameworks-new.png" alt="Project banner" width="1000">
 </p>
+
+[![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
+[![GitHub stars](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
+
 
 This repository provides examples and reference architectures for building autonomous agents using popular frameworks like LangGraph, CrewAI, and LlamaIndex on AWS services. These examples demonstrate how to leverage AWS services to create production-ready agent applications for various industry verticals.
 
