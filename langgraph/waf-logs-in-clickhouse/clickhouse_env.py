@@ -1,9 +1,3 @@
-"""Environment configuration for the MCP ClickHouse server.
-
-This module handles all environment variable configuration with sensible defaults
-and type conversion.
-"""
-
 from dataclasses import dataclass
 import os
 from typing import Optional

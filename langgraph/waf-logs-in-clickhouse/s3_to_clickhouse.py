@@ -1,18 +1,23 @@
 import boto3
-from clickhouse_driver import Client
+#from clickhouse_driver import Client
 from datetime import datetime, timezone
 import json
 import gzip
 import io
+from clickhouse_client import ClickHouseClient
 
-HOST_NAME = 'ec2-13-203-227-83.ap-south-1.compute.amazonaws.com'
+
+
+WAF_LOGS_BUCKET = 'xxxx'
+WAF_LOGS_BUCKET_PREFIX = 'xxxx'
 
 class WAFLogProcessor:
     def __init__(self):
         self.s3 = boto3.client('s3')
-        self.clickhouse = Client(host=HOST_NAME)
-        self.bucket = 'aws-waf-logs-clickhousewaftest001'
-        self.prefix = 'AWSLogs/440462743375/WAFLogs/ap-south-1/CreatedByALB-clickhousetestalb'
+
+        self.clickhouse = ClickHouseClient()
+        self.bucket = WAF_LOGS_BUCKET
+        self.prefix = WAF_LOGS_BUCKET_PREFIX
 
     def create_table(self):
 
