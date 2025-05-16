@@ -1,4 +1,12 @@
-# clickhouse-waf-logs-langgraph
+# Analyse AWS WAF logs with natural language
+This sample demonstrates ingesting WAF logs in Clickhouse database and searching these using natural language.
+
+## Architecture
+
+![Architecture diagram](architecture.png)
+
+
+
 
 ## Pre-requisites
 You need to configure Clickhouse DB configuration parameters in `.env` file. 
