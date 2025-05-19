@@ -21,6 +21,7 @@ This repository provides examples and reference architectures for building auton
 - [🤝 Multi-Agent Collaboration and Orchestration using LangGraph for Mistral Models](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Multi_Agent_LangGraph_Mistral.ipynb)
 - [🔀 Mistral-AWS ecosystem LLM router - ReAct Agent with LangChain](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Mistral-AWS-ecosystem-LLM-router.ipynb)
 - [👀 Vision QA Agent with Mistral and LlamaIndex](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/llamaindex/Vision_QA_Agent_with_Mistral_and_LlamaIndex.ipynb)
+- [🛠️ End-to-End Serverless Multi-Agent System: A2A Protocol Implementation on AWS](https://github.com/aws-samples/3P-Agentic-Frameworks/tree/main/a2a-protocol/a2a-advisory-trading)
 
 ## AWS Blogs 
 - [🛠️ Build agentic systems with CrewAI and Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/build-agentic-systems-with-crewai-and-amazon-bedrock/)
