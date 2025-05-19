@@ -1,6 +1,6 @@
 # A2A Advisory Trading
 
-A stateful multi-agent serverless application built on Google's Agent2Agent Protocol for intelligent trading advisory services, powered by Amazon Bedrock, LangChain, and LangGraph.
+A stateful multi-agent serverless application built on Google's Agent2Agent Protocol for intelligent trading advisory services, powered by Amazon Bedrock.
 
 This project serves as a reference implementation demonstrating how to design and deploy multi-agent systems using Google's Agent2Agent Protocol on AWS through a serverless architecture, powered by Amazon Bedrock. It showcases practical patterns for building production-ready, stateful agent networks while leveraging cloud-native services.
 
@@ -39,8 +39,8 @@ The platform leverages Google's Agent2Agent Protocol to enable:
   - Support for specialized tasks
   - Reasoning for task analysis and agent selection 
 
-#### LangGraph Integration
-The platform leverages LangGraph's capabilities for:
+#### Next Step: LangGraph/LangChain Integration
+The platform can leverage LangGraph's capabilities for:
 - Agent Orchestration
 - State Management
 - Reasoning Engine
