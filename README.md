@@ -16,6 +16,7 @@ This repository provides examples and reference architectures for building auton
 - [Workshops](#Workshops)
 
 ## Examples
+- [🛡️ Reference Implementation Building Multi-agent using Agent2Agent Protocol on AWS Serverless Architecture](https://github.com/aws-samples/3P-Agentic-Frameworks/tree/main/a2a-protocol/a2a-advisory-trading)
 - [🛡️ AWS Infrastructure Security Audit And Reporting Crew](https://github.com/aws-samples/3P-Agentic-Frameworks/tree/main/crewai/aws-security-auditor-crew)
 - [🤖 Automate Customer Support with Amazon Bedrock, LangGraph and Mistral models](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Customer_Support_Automation_with_Bedrock_and_LangGraph.ipynb)
 - [🤝 Multi-Agent Collaboration and Orchestration using LangGraph for Mistral Models](https://github.com/aws-samples/3P-Agentic-Frameworks/blob/main/langchain/Multi_Agent_LangGraph_Mistral.ipynb)
