@@ -1,6 +1,7 @@
 import boto3
 import os
 import uuid
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 from a2a_core import get_logger
@@ -19,11 +20,11 @@ class TradeExecutionAgent:
         quantity = input_data.get("quantity")
         symbol = input_data.get("symbol")
 
-        if action not in ["Buy", "Sell"]:
+        if action not in ["Buy", "Sell", "buy", "sell", "BUY", "SELL"]:
             return "Invalid action. Must be 'Buy' or 'Sell'."
         if not isinstance(quantity, int) or quantity <= 0:
             return "Quantity must be a positive integer."
-        if not isinstance(symbol, str) or len(symbol) < 1:
+        if not isinstance(symbol, str) or not symbol:
             return "Symbol must be a non-empty string."
         return None
 
@@ -44,7 +45,7 @@ class TradeExecutionAgent:
             Item=item
         )
 
-        print("Trade logged to DynamoDB", {
+        print("Trade logged", {
             "confirmationId": confirmation_id,
             "symbol": trade["symbol"],
             "quantity": trade["quantity"],
@@ -54,7 +55,8 @@ class TradeExecutionAgent:
         return confirmation_id
 
     def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        print("Received trade input", {"input": input_data})
+        start = time.time()
+        print("Received trade execution request", {"input": input_data})
 
         error = self.validate(input_data)
         if error:
@@ -65,6 +67,10 @@ class TradeExecutionAgent:
             }
 
         confirmation = self.log_trade(input_data)
+
+        duration = time.time() - start
+        print("Trade execution complete", {"duration_sec": duration})
+
         return {
             "status": "executed",
             "confirmationId": confirmation

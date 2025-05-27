@@ -74,7 +74,7 @@ variable "custom_layer" {
 variable "bedrock_model_id" {
   type        = string
   description = "Bedrock model ID used by the agent"
-  default     = "anthropic.claude-3-sonnet-20240229-v1:0"
+  default     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 }
 
 variable "trade_log_table_name" {

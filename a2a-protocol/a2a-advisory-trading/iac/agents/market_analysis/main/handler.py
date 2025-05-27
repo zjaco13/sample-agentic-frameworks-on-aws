@@ -1,8 +1,7 @@
 import json
 from datetime import datetime
-from a2a_core import Task
+from a2a_core import Task, get_logger
 from main import MarketAnalysisAgent
-from a2a_core import get_logger
 
 logger = get_logger({"agent": "MarketAnalysisHandler"})
 
@@ -14,7 +13,7 @@ def lambda_handler(event, context):
 
         agent = MarketAnalysisAgent()
         result = agent.analyze(task.input or {})
-        print("Market Analysis result completed.")
+
         task.output = result
         task.status = "completed"
         task.modified_at = datetime.now().isoformat()

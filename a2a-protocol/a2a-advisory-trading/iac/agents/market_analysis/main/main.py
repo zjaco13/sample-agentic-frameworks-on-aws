@@ -2,6 +2,8 @@ import boto3
 import json
 import os
 import re
+import io
+import time
 from typing import Dict, Any, Optional
 from a2a_core import get_logger
 
@@ -28,46 +30,44 @@ def build_prompt(input_data: Dict[str, Any]) -> str:
 
 class MarketAnalysisAgent:
     def __init__(self, model_id: Optional[str] = None, region: Optional[str] = "us-east-1"):
-        self.model_id = model_id or os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
+        self.model_id = model_id or os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
         self.region = region or os.environ.get("AWS_REGION", "us-east-1")
         self.client = boto3.client(service_name="bedrock-runtime", region_name=self.region)
 
-    def converse(self, messages: list) -> str:
+    def _invoke_claude_stream(self, prompt: str) -> str:
         try:
-            response = self.client.converse(
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"text": prompt}]
+                }
+            ]
+
+            print("Calling Claude via streaming...", {"prompt_preview": prompt[:200]})
+
+            response_stream = self.client.converse_stream(
                 modelId=self.model_id,
                 messages=messages,
                 inferenceConfig={
+                    "maxTokens": 500,
                     "temperature": 0.5,
                     "topP": 0.9
-                },
-                additionalModelRequestFields={
-                    "top_k": 100
                 }
             )
 
-            text = response["output"]["message"]["content"][0]["text"]
-            return text.strip()
+            output = io.StringIO()
+            for event in response_stream["stream"]:
+                if "contentBlockDelta" in event:
+                    chunk = event["contentBlockDelta"]["delta"].get("text", "")
+                    output.write(chunk)
+
+            full_text = output.getvalue().strip()
+            print("Streaming complete", {"length": len(full_text)})
+            return full_text
 
         except Exception as e:
-            logger.error("Bedrock converse() failed", {"error": str(e)})
+            logger.error("Streaming failed", {"error": str(e)})
             raise e
-
-    def call_bedrock(self, prompt: str) -> str:
-        print("Calling Claude 3 via converse()", {"prompt_preview": prompt[:120]})
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-
-        return self.converse(messages)
 
     def extract_tags(self, summary: str) -> Dict[str, Any]:
         try:
@@ -86,46 +86,50 @@ class MarketAnalysisAgent:
                 }
             ]
 
-            response_text = self.converse(messages)
-            print("Claude raw tag extraction response", {"response": response_text})
+            response_stream = self.client.converse_stream(
+                modelId=self.model_id,
+                messages=messages,
+                inferenceConfig={
+                    "maxTokens": 200,
+                    "temperature": 0.3,
+                    "topP": 0.9
+                }
+            )
 
-            json_match = re.search(r'\{[\s\S]*?\}', response_text)
-            if not json_match:
-                logger.warning("No valid JSON block found in response")
+            output = io.StringIO()
+            for event in response_stream["stream"]:
+                if "contentBlockDelta" in event:
+                    output.write(event["contentBlockDelta"]["delta"].get("text", ""))
+
+            response_text = output.getvalue().strip()
+            print("Tag extraction response received", {"raw": response_text})
+
+            match = re.search(r'\{[\s\S]*?\}', response_text)
+            if not match:
                 return {"tags": [], "sentiment": "unknown"}
 
-            raw_json = json_match.group()
-
-            parsed = json.loads(raw_json)
+            parsed = json.loads(match.group())
             if isinstance(parsed, str):
-                print("Nested JSON detected, double parsing required")
                 parsed = json.loads(parsed)
 
-            if isinstance(parsed, dict) and "tags" in parsed and "sentiment" in parsed:
-                return parsed
-
-            logger.warning("Parsed JSON is missing required fields")
-            return {"tags": [], "sentiment": "unknown"}
+            return {
+                "tags": parsed.get("tags", []),
+                "sentiment": parsed.get("sentiment", "unknown")
+            }
 
         except Exception as e:
-            logger.error("Tag extraction failed", {
-                "error": str(e),
-                "summary": summary
-            })
+            logger.error("Tag extraction failed", {"error": str(e)})
             return {"tags": [], "sentiment": "unknown"}
-
 
     def analyze(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
             prompt = build_prompt(input_data)
-            print("Analysis started", {
-                "input": input_data
-            })
+            start = time.time()
 
-            summary = self.call_bedrock(prompt)
+            summary = self._invoke_claude_stream(prompt)
 
             if not summary:
-                logger.warning("No summary returned from Bedrock")
+                logger.warning("No summary returned")
                 return {
                     "summary": "",
                     "tags": [],
@@ -134,8 +138,9 @@ class MarketAnalysisAgent:
 
             tag_data = self.extract_tags(summary)
 
-            print("Analysis completed", {
-                "summaryLength": len(summary),
+            duration = time.time() - start
+            print("Market analysis complete", {
+                "duration_sec": duration,
                 "tags": tag_data.get("tags"),
                 "sentiment": tag_data.get("sentiment")
             })

@@ -37,13 +37,6 @@ config:
 #### Deploy core
 ##################################################
 
-IAC_DIR :=iac
-LAYER_DIR=iac/layers
-LAYER_ZIP=a2a_core.zip
-LAYER_KEY=layers/a2a_core.zip
-RANDOM_NUM := $(shell date +%s | md5sum | head -c 16)
-LAYER_BUCKET_NAME = $(APP_NAME)-$(ENV_NAME)-a2a-core-$(RANDOM_NUM)
-
 create-bucket:
 	@echo "Creating S3 bucket if it doesn't exist..."
 	@if aws s3 ls "s3://$(LAYER_BUCKET_NAME)" 2>&1 | grep -q 'NoSuchBucket'; then \
@@ -74,7 +67,6 @@ zip-layer:
 		rm -rf $(IAC_DIR)/temp; \
 		exit 1; \
 	fi
-
 
 upload-layer: create-bucket zip-layer
 	@echo "Uploading layer to S3..."

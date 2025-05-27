@@ -3,7 +3,7 @@ import os
 
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0")
+    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
     region = os.environ.get("AWS_REGION", "us-east-1")
 
     return {
@@ -18,7 +18,7 @@ def lambda_handler(event, context):
                 "send": f"https://{domain}/dev/tasks/send"
             },
             "metadata": {
-                "streaming": False,
+                "streaming": True,
                 "modelId": model_id,
                 "region": region,
                 "provider": "Bedrock/Anthropic",
