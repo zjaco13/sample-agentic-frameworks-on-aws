@@ -20,7 +20,7 @@ module "trade_execution" {
   lambda_bucket_card    = "${var.app_name}-${var.env_name}-lambda-trade-execution-agent-card-${random_id.suffix.hex}"
   capabilities          = ["ExecuteTrade"]
   memory_size           = 512
-  timeout               = 30
+  timeout               = 29
   custom_layer          = [module.shared_layer.a2a_core_layer_arn]
   trade_log_table_name  = "${var.app_name}-${var.env_name}-trade-execution"
 }

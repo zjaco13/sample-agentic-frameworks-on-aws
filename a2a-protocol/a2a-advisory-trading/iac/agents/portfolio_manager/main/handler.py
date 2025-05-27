@@ -1,54 +1,111 @@
 import json
+import asyncio
 from datetime import datetime
-from a2a_core import Task
+from a2a_core import Task, get_logger
 from main import PortfolioManagerAgent
-from a2a_core import get_logger
 
 logger = get_logger({"agent": "PortfolioManagerHandler"})
 
 def lambda_handler(event, context):
-    body = None
+    return asyncio.get_event_loop().run_until_complete(_async_handler(event, context))
+
+async def _async_handler(event, context):
     try:
-        body = json.loads(event["body"])
+        print("Received event", {"event": event})
+        
+        if isinstance(event, dict):
+            if "body" in event:
+                body = json.loads(event["body"]) if isinstance(event["body"], str) else event["body"]
+            else:
+                body = event
+
+        print("Processed body", {"body": body})
+
+        if not body.get("task"):
+            logger.error("No task in body")
+            raise ValueError("No task provided in the request body")
+
         task = Task.from_dict(body.get("task"))
-        input_data = task.input or {}
+        print("Created task object", {"task_id": task.id})
 
         agent = PortfolioManagerAgent()
-        result = agent.analyze(input_data, task.id)
-        print("Result of portfolio manager handler:", result)
-        print("Check input of task:", task.input)
+        print("Starting analysis", {"task_id": task.id})
+        
+        result = await agent.analyze(task.input or {}, task.id)
+        print("Analysis completed", {"task_id": task.id, "result_status": result.get("status")})
+
+        # Check if we need confirmation (Phase 1 response)
+        if result.get("status") == "pending":
+            response = {
+                "statusCode": 202,  # Accepted
+                "body": json.dumps({
+                    "status": "pending",
+                    "analysis_results": result["analysis_results"],
+                    "trade_details": result["trade_details"],
+                    "session_id": result["session_id"],
+                    "summary": result["summary"],
+                    "delegated_tasks": result["delegated_tasks"]
+                }),
+                "headers": {"Content-Type": "application/json"}
+            }
+            print("Returning pending response", {
+                "task_id": task.id,
+                "status_code": response["statusCode"]
+            })
+            return response
+
+        # Normal completion (Phase 1 non-trade or Phase 2 trade execution)
         task.output = result
-        print("Check task output:", task.output)
         task.status = "completed"
         task.modified_at = datetime.now().isoformat()
 
-        return {
+        response = {
             "statusCode": 200,
             "body": json.dumps(task.to_dict()),
             "headers": {"Content-Type": "application/json"}
         }
-
-    except Exception as e:
-        logger.error("PortfolioManager handler failed", {
-            "error": str(e),
-            "event": event
+        print("Returning successful response", {
+            "task_id": task.id,
+            "status_code": response["statusCode"]
         })
+        return response
 
-        task_id = "unknown"
-        if body and isinstance(body, dict):
-            task_id = body.get("task", {}).get("id", "unknown")
-
-        error_task = Task(
-            id=task_id,
-            status="failed",
-            error={"message": str(e), "type": type(e).__name__},
-            created_at=datetime.now().isoformat(),
-            modified_at=datetime.now().isoformat()
-        )
-
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse JSON body", {
+            "error": str(e),
+            "event_body": event.get("body") if isinstance(event, dict) else event
+        })
         return {
-            "statusCode": 500,
-            "body": json.dumps(error_task.to_dict()),
+            "statusCode": 400,
+            "body": json.dumps({
+                "error": "Invalid JSON in request body",
+                "details": str(e)
+            }),
+            "headers": {"Content-Type": "application/json"}
+        }
+    
+    except ValueError as e:
+        logger.error("Validation error", {"error": str(e)})
+        return {
+            "statusCode": 400,
+            "body": json.dumps({
+                "error": "Validation error",
+                "details": str(e)
+            }),
             "headers": {"Content-Type": "application/json"}
         }
 
+    except Exception as e:
+        logger.error("Unexpected error in handler", {
+            "error": str(e),
+            "error_type": type(e).__name__
+        })
+        return {
+            "statusCode": 500,
+            "body": json.dumps({
+                "error": "Internal server error",
+                "error_type": type(e).__name__,
+                "details": str(e)
+            }),
+            "headers": {"Content-Type": "application/json"}
+        }
