@@ -133,6 +133,16 @@ py cli.py
 
 #### Demo
 
+![Demo Image 01](docs/demo/adt-01.png)
+![Demo Image 02](docs/demo/adt-02.png)
+![Demo Image 03](docs/demo/adt-03.png)
+![Demo Image 04](docs/demo/adt-04.png)
+![Demo Image 05](docs/demo/adt-05.png)
+![Demo Image 06](docs/demo/adt-06.png)
+![Demo Image 07](docs/demo/adt-07.png)
+
+View the Demo Video: 
+
 ![Demo Video](docs/demo/adt-demo.mp4)
 
 ### Use Cases
