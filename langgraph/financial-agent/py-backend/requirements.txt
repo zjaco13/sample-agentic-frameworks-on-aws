@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic
+boto3
+botocore
+typing-extensions
+python-dotenv
+langgraph
+langgraph-checkpoint-aws
+mcp
+yfinance>=0.2.58
+duckduckgo-search
+setuptools
+aiohttp
