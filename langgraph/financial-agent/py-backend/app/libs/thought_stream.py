@@ -22,6 +22,8 @@ class ThoughtStore:
         return self.queues[session_id]
 
     def unregister_session(self, session_id: str):
+        logger.info(f"Unregistering session: {session_id}")
+        
         if session_id in self.queues:
             del self.queues[session_id]
         if session_id in self.events:
@@ -93,8 +95,9 @@ class ThoughtProcessHandler:
     
     def mark_session_complete(self, session_id: str) -> None:
         """Mark a session as completed"""
-        logger.info(f"Marking thought stream session complete: {session_id}")
+        logger.info(f"Marking session complete: {session_id}")
         self.thought_store.mark_complete(session_id)
+        
         if session_id in self.callbacks:
             del self.callbacks[session_id]
     
@@ -114,7 +117,7 @@ class ThoughtProcessHandler:
         
         connection_msg = {"type": "connected", "message": "Thought process stream connected"}
         yield format_sse(connection_msg)
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
         
         cached_thoughts = []
         while not queue.empty():
@@ -127,7 +130,13 @@ class ThoughtProcessHandler:
             if "id" not in thought:
                 thought["id"] = f"{session_id}-cached-{idx}"
             yield format_sse(thought)
-            await asyncio.sleep(0.01)
+            
+            # Tool-related cached thoughts get immediate streaming
+            thought_category = thought.get('category', '')
+            if thought_category == 'tool' or 'tool' in thought.get('node', '').lower():
+                await asyncio.sleep(0.01)  # Immediate for tool events
+            else:
+                await asyncio.sleep(0.1)   # Delayed for other events
         
         thought_count = len(cached_thoughts)
         ping_count = 0
@@ -143,14 +152,20 @@ class ThoughtProcessHandler:
                         
                     logger.info(f"Streaming thought #{thought_count} for session {session_id}: {thought.get('type', 'unknown')}")
                     yield format_sse(thought)
-                    await asyncio.sleep(0.01)
+                    
+                    # Tool-related thoughts get immediate streaming, others get delay
+                    thought_category = thought.get('category', '')
+                    if thought_category == 'tool' or 'tool' in thought.get('node', '').lower():
+                        await asyncio.sleep(0.01)  # Immediate for tool events
+                    else:
+                        await asyncio.sleep(0.1)   # Delayed for other events
                 else:
                     ping_count += 1
                     if ping_count >= 10:  
                         ping_count = 0
                         yield format_sse({"type": "ping", "timestamp": f"{time.time()}"})
                     
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.5)
             except Exception as e:
                 logger.error(f"Error in thought stream for session {session_id}: {e}")
                 yield format_sse({"type": "error", "message": str(e)})

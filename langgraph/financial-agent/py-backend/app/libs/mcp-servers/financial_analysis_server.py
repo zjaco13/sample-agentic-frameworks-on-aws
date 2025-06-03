@@ -458,19 +458,13 @@ async def comprehensive_analysis(equity: str) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description='Run Financial Analysis MCP server')
-    parser.add_argument('--sse', action='store_true', help='Use SSE transport')
     parser.add_argument('--port', type=int, default=8086, help='Port to run the server on')
     
     args = parser.parse_args()
     
-    if args.sse:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Financial Analysis server with SSE transport on port {args.port}")
-        mcp.run(transport='sse')
-    else:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Financial Analysis server on port {args.port}")
-        mcp.run()
+    mcp.settings.port = args.port
+    logger.info(f"Starting Financial Analysis server with Streamable HTTP transport on port {args.port}")
+    mcp.run(transport='streamable-http')
 
 if __name__ == "__main__":
     main()

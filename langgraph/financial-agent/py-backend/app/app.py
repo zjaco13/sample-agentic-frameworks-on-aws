@@ -1,6 +1,6 @@
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from app.api_routes import thought_stream, mcp_servers, router
+from app.api_routes import thought_stream, mcp_servers, router, file_download
 import os
 import logging
 import subprocess
@@ -11,7 +11,7 @@ log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
 
 logging.basicConfig(
-    level=logging.WARNING,  
+    level=logging.INFO,  # Changed to INFO to see debug messages
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
         logging.FileHandler(log_dir / "app.log"),
@@ -19,9 +19,12 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("app")
-logging.getLogger('router_api').setLevel(logging.WARNING)
-logging.getLogger('thought_stream').setLevel(logging.WARNING)
-logging.getLogger('graph').setLevel(logging.WARNING)
+# Set specific loggers to INFO to see our debug messages
+logging.getLogger('router_api').setLevel(logging.INFO)
+logging.getLogger('thought_stream').setLevel(logging.INFO)
+logging.getLogger('strands_reasoning').setLevel(logging.INFO)
+logging.getLogger('graph').setLevel(logging.INFO)
+# Keep these at WARNING to reduce noise
 logging.getLogger('botocore').setLevel(logging.WARNING)
 logging.getLogger('boto3').setLevel(logging.WARNING)
 
@@ -39,6 +42,7 @@ app = FastAPI(title="Financial Agent API")
 app.include_router(thought_stream.router, prefix="/api/financial")
 app.include_router(mcp_servers.router, prefix="/api/mcp-servers", tags=["MCP Servers"])
 app.include_router(router.router, prefix="/api/router", tags=["Router"])
+app.include_router(file_download.router, prefix="/api/files", tags=["File Downloads"])
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,6 +82,10 @@ async def startup_event():
         'news': {
             'path': os.path.join(libs_dir, "mcp-servers/web_news_server.py"),
             'port': 8085
+        },
+        'word': {
+            'path': os.path.join(libs_dir, "mcp-servers/word_generator.py"),
+            'port': 8089
         }
     }
 
@@ -85,7 +93,7 @@ async def startup_event():
         try:
             logger.info(f"Starting {server_name} MCP server on port {config['port']}")
             process = subprocess.Popen(
-                [sys.executable, config['path'], "--port", str(config['port']), "--sse"],
+                [sys.executable, config['path'], "--port", str(config['port'])],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

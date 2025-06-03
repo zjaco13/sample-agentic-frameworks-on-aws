@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, Body
 from typing import List, Dict, Optional, Any
 import json
 import os
+import logging
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Path to store server configuration
@@ -55,7 +57,7 @@ def load_server_config() -> List[Dict[str, Any]]:
             save_server_config(DEFAULT_SERVERS)
             return DEFAULT_SERVERS
     except Exception as e:
-        print(f"Error loading MCP server config: {e}")
+        logger.error(f"Error loading MCP server config: {e}")
         return DEFAULT_SERVERS
 
 def save_server_config(servers: List[Dict[str, Any]]) -> None:
@@ -63,7 +65,7 @@ def save_server_config(servers: List[Dict[str, Any]]) -> None:
         with open(MCP_SERVER_CONFIG_PATH, "w") as f:
             json.dump(servers, f, indent=2)
     except Exception as e:
-        print(f"Error saving MCP server config: {e}")
+        logger.error(f"Error saving MCP server config: {e}")
 
 @router.get("/", response_model=List[MCPServer])
 async def get_mcp_servers():
@@ -81,19 +83,22 @@ async def update_mcp_servers(servers: List[MCPServer] = Body(...)):
 async def test_mcp_server(request: ServerTestRequest = Body(...)):
     """Tests connection to a specific MCP server."""
     from mcp import ClientSession
-    from mcp.client.sse import sse_client
+    from mcp.client.streamable_http import streamablehttp_client
     import asyncio
     
     try:
-        # Test server connection with 3 second timeout
-        async with asyncio.timeout(3):
-            async with sse_client(url=request.hostname) as (read_stream, write_stream):
+        # Test server connection with 5 second timeout
+        async with asyncio.timeout(5):
+            async with streamablehttp_client(url=request.hostname) as (read_stream, write_stream, get_session_id):
                 session = ClientSession(read_stream, write_stream)
                 async with session as s:
                     await s.initialize()
                     # Test connection by fetching tools list
                     tools_result = await s.list_tools()
-                    return {"success": True}
+                    return {"success": True, "tools_count": len(tools_result.tools) if tools_result.tools else 0}
     except Exception as e:
-        print(f"MCP server connection test failed: {e}")
-        return {"success": False, "error": str(e)}
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"MCP server connection test failed: {e}")
+        logger.error(f"Full error trace: {error_details}")
+        return {"success": False, "error": str(e), "details": error_details}

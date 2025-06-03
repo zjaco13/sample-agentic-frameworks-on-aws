@@ -23,7 +23,36 @@ class ConversationMemoryManager:
         self.active_sessions = set()  
         self.session_expiry_seconds = 3600
         self.max_messages_per_conversation = 50
+        self.sliding_window_size = 30  # Keep only the most recent 30 messages
         logger.info("ConversationMemoryManager initialized")
+    
+    def _apply_sliding_window(self, session_id: str) -> None:
+        """Apply sliding window to keep only the most recent messages."""
+        if session_id not in self.conversations:
+            return
+            
+        messages = self.conversations[session_id]["messages"]
+        if len(messages) <= self.sliding_window_size:
+            return
+            
+        # Separate system messages from other messages
+        system_messages = []
+        other_messages = []
+        
+        for msg in messages:
+            if msg.get('role') == 'system':
+                system_messages.append(msg)
+            else:
+                other_messages.append(msg)
+        
+        # Keep all system messages + most recent user/assistant messages
+        if len(other_messages) > self.sliding_window_size:
+            # Keep the most recent messages within the window
+            recent_messages = other_messages[-self.sliding_window_size:]
+            self.conversations[session_id]["messages"] = system_messages + recent_messages
+            
+            removed_count = len(other_messages) - self.sliding_window_size
+            logger.info(f"Applied sliding window to session {session_id}: removed {removed_count} old messages, kept {len(recent_messages)} recent + {len(system_messages)} system messages")
     
     def ensure_session_exists(self, session_id: str) -> bool:
         if session_id in self.conversations:
@@ -93,6 +122,10 @@ class ConversationMemoryManager:
         
         self.conversations[session_id]["messages"].append(message)
         self._update_session_metadata(session_id, increment_turn=True)
+        
+        # Apply sliding window after adding message
+        self._apply_sliding_window(session_id)
+        
         return True
 
     
@@ -109,6 +142,10 @@ class ConversationMemoryManager:
         
         self.conversations[session_id]["messages"].append(message)
         self._update_session_metadata(session_id, increment_turn=True)
+        
+        # Apply sliding window after adding message
+        self._apply_sliding_window(session_id)
+        
         logger.debug(f"Added assistant message from {source} to session {session_id}: {content[:50]}...")
         return True
     

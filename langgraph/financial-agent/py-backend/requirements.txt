@@ -6,9 +6,13 @@ botocore
 typing-extensions
 python-dotenv
 langgraph
-langgraph-checkpoint-aws
 mcp
 yfinance>=0.2.58
 duckduckgo-search
 setuptools
 aiohttp
+strands-agents
+strands-agents-tools
+python-docx
+matplotlib
+numpy

@@ -14,7 +14,7 @@ from langgraph.graph import END
 logger = logging.getLogger(__name__)
 
 @with_thought_callback(category="visualization", node_name="Visualization")
-async def visualize_data(state: GraphState) -> GraphState:
+async def create_visualization(state: GraphState) -> GraphState:
     logger.info("Visualization node: Generating chart data...")
     
     new_state = state.copy()
@@ -28,6 +28,11 @@ async def visualize_data(state: GraphState) -> GraphState:
         new_state["metadata"] = {}
     new_state["metadata"]["last_active_node"] = "visualize_data"
     
+    # Initialize retry tracking
+    retry_count = new_state["metadata"].get("visualization_retry_count", 0)
+    max_retries = 2  # Allow up to 2 retries (3 total attempts)
+    previous_error = new_state["metadata"].get("visualization_error", "")
+    
     processed_messages = []
     if session_id:
         messages_from_memory = conversation_memory.get_conversation_history(session_id)["messages"]
@@ -39,19 +44,34 @@ async def visualize_data(state: GraphState) -> GraphState:
         }]
     
     try:
-        log_thought(
-            session_id=session_id,
-            type="thought",
-            category="analysis", 
-            node="Visualization",
-            content="Creating visualizations from your data."
-        )
-        await asyncio.sleep(0.5)
+        # Log retry status if applicable
+        if retry_count > 0:
+            log_thought(
+                session_id=session_id,
+                type="thought",
+                category="analysis", 
+                node="Visualization",
+                content=f"Retrying visualization generation (attempt {retry_count + 1}/{max_retries + 1}). Previous error: {previous_error}"
+            )
+        else:
+            log_thought(
+                session_id=session_id,
+                type="thought",
+                category="analysis", 
+                node="Visualization",
+                content="Creating visualizations from your data."
+            )
+        await asyncio.sleep(1.0)
         
         client = create_bedrock_client(region)
         
+        # Enhance system prompt with error context if retrying
+        enhanced_prompt = VISUALIZATION_SYSTEM_PROMPT
+        if retry_count > 0 and previous_error:
+            enhanced_prompt += f"\n\nIMPORTANT: This is a retry attempt. The previous attempt failed with this error: {previous_error}\nPlease ensure the JSON output is properly formatted and follows the exact schema requirements. Pay special attention to:\n- Proper JSON syntax with matching braces and quotes\n- All required fields are present\n- Data array is properly structured\n- ChartConfig object is correctly formatted"
+        
         system_prompt = [{
-            "text": VISUALIZATION_SYSTEM_PROMPT
+            "text": enhanced_prompt
         }]
         
         # Direct conversation without tools
@@ -129,9 +149,9 @@ async def visualize_data(state: GraphState) -> GraphState:
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Error parsing JSON from response: {str(e)}")
-                raise ValueError(f"Invalid chart data format: {str(e)}")
+                raise ValueError(f"JSON parsing error: {str(e)}. JSON content: {json_str[:200]}...")
         else:
-            raise ValueError("No JSON data found in the response")
+            raise ValueError("No JSON data found in the response. Please ensure the response contains a properly formatted JSON block enclosed in ```json and ``` markers.")
         
         # Clean up response text by removing the JSON block
         response_text = re.sub(json_pattern, "", response_text).strip()
@@ -174,30 +194,56 @@ async def visualize_data(state: GraphState) -> GraphState:
                 visualization=visualization_data
             )
         
+        # Clear retry tracking on success
+        new_state["metadata"]["visualization_retry_count"] = 0
+        new_state["metadata"]["visualization_error"] = ""
         new_state["route_to"] = END
         return new_state
         
     except Exception as e:
-        logger.error(f"Error generating visualization: {str(e)}")
-        error_message = f"I'm sorry, I encountered an error while generating the visualization: {str(e)}"
+        logger.error(f"Error generating visualization (attempt {retry_count + 1}): {str(e)}")
         
-        log_thought(
-            session_id=session_id,
-            type="thought",
-            category="error",
-            node="Visualization",
-            content=f"Error generating visualization: {str(e)}"
-        )
-        
-        if session_id:
-            conversation_memory.add_assistant_message(
-                session_id,
-                error_message,
-                source="visualization_error"
+        # Check if we should retry
+        if retry_count < max_retries:
+            # Increment retry count and store error for next attempt
+            new_state["metadata"]["visualization_retry_count"] = retry_count + 1
+            new_state["metadata"]["visualization_error"] = str(e)
+            
+            log_thought(
+                session_id=session_id,
+                type="thought",
+                category="error",
+                node="Visualization",
+                content=f"Visualization attempt {retry_count + 1} failed: {str(e)}. Preparing to retry..."
             )
-        
-        new_state["chart_content"] = error_message
-        new_state["error"] = str(e)
-        new_state["answer"] = error_message
-        new_state["route_to"] = END
-        return new_state
+            
+            # Return to same node for retry
+            new_state["route_to"] = "visualize_data"
+            return new_state
+        else:
+            # Max retries exceeded - graceful failure
+            error_message = f"I apologize, but I encountered persistent issues generating the visualization after {max_retries + 1} attempts. The final error was: {str(e)}\n\nPlease try rephrasing your visualization request or provide more specific requirements for the chart you'd like to see."
+            
+            log_thought(
+                session_id=session_id,
+                type="thought",
+                category="error",
+                node="Visualization",
+                content=f"Visualization failed after {max_retries + 1} attempts. Final error: {str(e)}. Gracefully ending workflow."
+            )
+            
+            if session_id:
+                conversation_memory.add_assistant_message(
+                    session_id,
+                    error_message,
+                    source="visualization_error"
+                )
+            
+            # Clear retry tracking and gracefully end
+            new_state["metadata"]["visualization_retry_count"] = 0
+            new_state["metadata"]["visualization_error"] = ""
+            new_state["chart_content"] = error_message
+            new_state["error"] = str(e)
+            new_state["answer"] = error_message
+            new_state["route_to"] = END
+            return new_state
