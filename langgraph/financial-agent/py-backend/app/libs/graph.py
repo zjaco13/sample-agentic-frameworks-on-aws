@@ -4,14 +4,14 @@ from langgraph.graph import END, StateGraph
 from app.libs.utils import get_or_create_clients
 from app.libs.types import GraphState
 from app.libs.nodes import (
-    router_preprocess, 
-    llm_router, 
-    prepare_analysis,
-    perform_reasoning,
-    tool_executor, 
-    direct_response,
+    process_router, 
+    classify_request, 
+    prepare_financial_analysis,
+    handle_chat,
     process_file,
-    visualize_data
+    create_visualization,
+    execute_financial_analysis,
+    execute_document_generation
 )
 
 logger = logging.getLogger(__name__)
@@ -31,42 +31,43 @@ def create_workflow_graph():
     logger.info("Compiling workflow graph")
     graph = StateGraph(GraphState)
     
-    graph.add_node("router_preprocess", router_preprocess)
-    graph.add_node("llm_router", llm_router)
-    graph.add_node("prepare_analysis", prepare_analysis)
-    graph.add_node("perform_reasoning", perform_reasoning)
-    graph.add_node("tool_executor", tool_executor)
+    graph.add_node("process_router", process_router)
+    graph.add_node("classify_request", classify_request)
+    graph.add_node("prepare_financial_analysis", prepare_financial_analysis)
+    graph.add_node("execute_financial_analysis", execute_financial_analysis) 
     graph.add_node("process_file", process_file)
-    graph.add_node("visualize_data", visualize_data)
-    graph.add_node("direct_response", direct_response)
+    graph.add_node("create_visualization", create_visualization)
+    graph.add_node("handle_chat", handle_chat)
+    graph.add_node("execute_document_generation", execute_document_generation)
     
-    graph.set_entry_point("router_preprocess")
+    graph.set_entry_point("process_router")
     
     graph.add_conditional_edges(
-        "router_preprocess",
+        "process_router",
         lambda state: state["route_to"]
     )
     
     graph.add_conditional_edges(
-        "llm_router",
+        "classify_request",
         lambda state: 
-            "prepare_analysis" if state["route_to"] == "financial_analysis" 
-            else "visualize_data" if state["route_to"] == "visualize_data" 
+            "prepare_financial_analysis" if state["route_to"] == "financial_analysis" 
+            else "create_visualization" if state["route_to"] == "visualize_data"
+            else "execute_document_generation" if state["route_to"] == "document_task"
             else state["route_to"]
     )
     
-    graph.add_edge("process_file", "visualize_data")
-    graph.add_edge("visualize_data", END)
+    graph.add_edge("process_file", "create_visualization")
     
-    graph.add_edge("prepare_analysis", "perform_reasoning")
-    
+    # Add conditional edge for visualization retry logic
     graph.add_conditional_edges(
-        "perform_reasoning",
-        lambda state: state.get("next", END)
+        "create_visualization",
+        lambda state: state["route_to"]
     )
     
-    graph.add_edge("tool_executor", "perform_reasoning")
-    graph.add_edge("direct_response", END)
+    graph.add_edge("prepare_financial_analysis", "execute_financial_analysis")
+    graph.add_edge("execute_financial_analysis", END)
+    graph.add_edge("execute_document_generation", END)
+    graph.add_edge("handle_chat", END)
     
     _compiled_graph = graph.compile()
     return _compiled_graph

@@ -1,25 +1,47 @@
 # Financial Analysis Agent
 
-> An intelligent financial assistant powered by LangGraph and AWS Bedrock with MCP integration
+> An intelligent financial assistant powered by LangGraph, Strands Agent, and AWS Bedrock with MCP integration
 
-<div align="left"><img src="./public/stock_prices.png" width="800" alt="Stock Prices" /></div>
-
-<div align="left"><img src="./public/financial_search.png" width="800" alt="Financial Search" /></div>
-
-<div align="left"><img src="./public/visualization.png" width="800" alt="Visualization" /></div>
+<div align="left"><img src="./public/thought_process.svg" width="800" alt="Thought Process" /></div>
 
 
 ## Overview
 
-The Financial Analysis Agent is an AI-powered assistant designed to handle a wide range of financial requirements and queries. Built on a hybrid architecture that combines LangGraph's structured reasoning with AWS Bedrock's powerful language models, this agent can analyze financial data, provide insights, and assist with financial decision-making.
+The Financial Analysis Agent is an AI-powered assistant designed to handle a wide range of financial requirements, document generation, and queries. Built on a hybrid architecture that combines LangGraph's structured workflow with Strands Agent framework and AWS Bedrock's powerful language models, this agent can analyze financial data, generate professional documents, provide insights, and assist with financial decision-making.
 
 ## Key Features
 
-- **Financial Domain Expertise**: Capable of processing and analyzing financial requirements, stock data, market trends, and other financial information
-- **LangGraph + AWS Bedrock Integration**: Combines the structured reasoning workflow of LangGraph with the powerful language models from AWS Bedrock
-- **Modular MCP (Model Context Protocol) Integration**: Expandable functionality through standardized MCP tools for various financial domains
-- **Interactive User Interface**: Clean, intuitive interface for natural conversation about financial topics
-- **Transparent Reasoning**: Visible thought process panel showing how the agent reasons through financial questions
+### Financial Domain Expertise
+- Process and analyze financial requirements, stock data, market trends, and other financial information
+- Generate financial reports and summaries
+- Provide market insights and investment analysis
+- Real-time stock quotes and historical data analysis
+
+### Document Generation
+- **Word Document Creation**: Generate professional Word documents with structured formatting
+- **Financial Reports**: Create comprehensive financial analysis reports
+- **Chart Integration**: Embed matplotlib-generated charts and visualizations in documents
+- **Download Management**: Secure file download system with automatic cleanup
+
+### Advanced AI Architecture
+- **LangGraph + Strands Integration**: Combines LangGraph's workflow management with Strands Agent's tool orchestration
+- **AWS Bedrock Integration**: Powered by Claude 3.7 Sonnet and other advanced language models
+- **Streaming Responses**: Real-time thought process visibility with buffered reasoning display
+
+### Modular MCP Integration
+- **Expandable Functionality**: Standardized MCP (Model Context Protocol) tools for various domains
+- **Financial Analysis Server**: Advanced financial calculations and analysis
+- **Stock Market Server**: Real-time market data and historical analysis
+- **Web News Server**: Financial news aggregation and sentiment analysis
+- **Word Generator Server**: Professional document creation with charts
+- **PDF Generator Server**: PDF document generation capabilities
+
+### Interactive User Interface
+- Clean, intuitive chat interface for natural conversation
+- Real-time thought process panel showing agent reasoning
+- Download buttons for generated documents
+- MCP server management interface
+- Theme support (light/dark mode)
 
 ## Architecture
 
@@ -105,16 +127,6 @@ cd py-backend
 pip install -r requirements.txt
 ```
 
-5. Configure environment variables:
-
-Create a `.env.local` file in the root directory with the following variables:
-
-```
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_REGION=your_region
-```
-
 ## Usage
 
 1. Start the development server:
@@ -131,8 +143,11 @@ This command will start both the Next.js frontend and the Python backend servers
 
 4. Configure MCP servers via the settings panel to extend functionality
 
-<div align="left"><img src="./public/thought_process.svg" width="800" alt="Thought Process" /></div>
+<div align="left"><img src="./public/stock_prices.png" width="800" alt="Stock Prices" /></div>
 
+<div align="left"><img src="./public/financial_search.png" width="800" alt="Financial Search" /></div>
+
+<div align="left"><img src="./public/visualization.png" width="800" alt="Visualization" /></div>
 
 ## Project Structure
 

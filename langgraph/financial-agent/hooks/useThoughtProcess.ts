@@ -76,6 +76,7 @@ export function useThoughtProcess(sessionId?: string) {
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState<boolean>(false);
   const [visualization, setVisualization] = useState<ChartData | null>(null);
+  const [requestTimestamp, setRequestTimestamp] = useState<number>(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const previousSessionRef = useRef<string | undefined>(undefined);
 
@@ -205,7 +206,7 @@ export function useThoughtProcess(sessionId?: string) {
   }, [handleEventData]);
 
   useEffect(() => {
-    // Create new EventSource only when sessionId changes
+    // Create new EventSource when sessionId changes
     if (sessionId && sessionId !== previousSessionRef.current) {
       // Close previous connection if exists
       if (eventSourceRef.current) {
