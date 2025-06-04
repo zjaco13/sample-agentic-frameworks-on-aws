@@ -122,8 +122,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
 
 ## Authors
 
-- Randy DeFauw - *Initial work* 
-- Ramprasath S - *Initial work* 
+- Randy DeFauw, Sr. Principal SA, AWS
+- Ramprasath S, Sr Applied AI Architect, AWS
 
 ## Security
 
