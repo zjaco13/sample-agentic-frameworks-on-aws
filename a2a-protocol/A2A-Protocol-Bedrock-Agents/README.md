@@ -1,4 +1,4 @@
-# Bedrock Agents with A2A Protocol - Internal Only, not an offical AWS code
+# Bedrock Agents with A2A Protocol
 
 This repository contains sample code to demonstrate how to create agents in Amazon Bedrock and enable communication between agents using the A2A (Agent-to-Agent) Protocol.
 
