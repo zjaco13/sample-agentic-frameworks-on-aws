@@ -4,7 +4,7 @@ import os
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
     region = os.environ.get("AWS_REGION", "us-east-1")
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
+    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
 
     return {
         "statusCode": 200,
@@ -13,7 +13,7 @@ def lambda_handler(event, context):
             "name": "MarketAnalysisAgent",
             "description": "Provides market analysis summaries and sentiment insights via Bedrock.",
             "protocol": "A2A/1.0",
-            "capabilities": ["MarketSummary"],
+            "skills": ["MarketSummary"],
             "endpoints": {
                 "send": f"https://{domain}/dev/tasks/send"
             },

@@ -28,9 +28,9 @@ variable "agent_intro" {
   description = "Description of the agent"
 }
 
-variable "capabilities" {
+variable "skills" {
   type        = list(string)
-  description = "Capabilities advertised by the agent"
+  description = "skills advertised by the agent"
 }
 
 variable "memory_size" {
@@ -74,7 +74,7 @@ variable "custom_layer" {
 variable "bedrock_model_id" {
   type        = string
   description = "Bedrock model ID used by the agent"
-  default     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  default     = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 }
 
 variable "trade_log_table_name" {
