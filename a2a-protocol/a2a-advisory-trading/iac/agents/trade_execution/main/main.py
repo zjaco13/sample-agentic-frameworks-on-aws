@@ -12,7 +12,7 @@ logger = get_logger({"agent": "TradeExecutionAgent"})
 class TradeExecutionAgent:
     def __init__(self, table_name: Optional[str] = None, region: Optional[str] = None):
         self.table_name = table_name or os.environ.get("TRADE_LOG_TABLE", "TradeExecutionLog")
-        self.region = region or os.environ.get("AWS_REGION", "us-east-1")
+        self.region = region or os.environ.get("AWS_PRIMARY_REGION", "us-east-1")
         self.client = boto3.client("dynamodb", region_name=self.region)
 
     def validate(self, input_data: Dict[str, Any]) -> Optional[str]:
@@ -20,7 +20,7 @@ class TradeExecutionAgent:
         quantity = input_data.get("quantity")
         symbol = input_data.get("symbol")
 
-        if action not in ["Buy", "Sell", "buy", "sell", "BUY", "SELL"]:
+        if action.lower() not in ["buy", "sell"]:
             return "Invalid action. Must be 'Buy' or 'Sell'."
         if not isinstance(quantity, int) or quantity <= 0:
             return "Quantity must be a positive integer."

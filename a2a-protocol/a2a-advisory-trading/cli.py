@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import time
 from queue import Queue
 import concurrent.futures
-from typing import List, Dict
+from typing import List, Dict, Optional
 import aiohttp
 from pyfiglet import figlet_format
 from colorama import Fore, init
@@ -166,7 +166,7 @@ def generate_dynamodb_link(table_name: str, region: str = 'us-east-1', task_id: 
 
     return base_url + query_params
 
-async def format_response(resp: dict, phase: str = "analysis"):
+async def format_response(resp: dict, phase: str = "analysis") -> None:
     print("\n" + Fore.CYAN + "🧠 Portfolio Manager Response:")
     print(Fore.YELLOW + "-" * 60)
 
@@ -182,7 +182,7 @@ async def format_response(resp: dict, phase: str = "analysis"):
             agent_outputs = resp.get("analysis_results", {})
 
         if summary:
-            format_block("📝 Analysis Summary", summary, Fore.GREEN)
+            format_block("📝 Base on your request, I have decomposed and delegated tasks to the following agent(s).", summary, Fore.GREEN)
 
         # Display analysis results from each agent
         for agent, result in agent_outputs.items():
@@ -219,6 +219,7 @@ async def format_response(resp: dict, phase: str = "analysis"):
         else:
             print(f"\n{Fore.YELLOW}ℹ️ Trade Cancelled by User")
 
+
 async def validate_trade_info(trade_details: dict) -> dict:
     updated_details = trade_details.copy()
 
@@ -227,11 +228,41 @@ async def validate_trade_info(trade_details: dict) -> dict:
     # Validate symbol
     if not updated_details.get('symbol') or updated_details.get('symbol') == 'TBD':
         while True:
-            user_input = input(f"{Fore.YELLOW}Enter the stock symbol: {Fore.RESET}").strip()
+            user_input = input(f"{Fore.YELLOW}\nEnter the stock symbol: {Fore.RESET}").strip()
             if user_input:
                 updated_details['symbol'] = user_input.upper()
                 break
             print(f"{Fore.RED}Symbol cannot be empty.{Fore.RESET}")
+    else:
+        print(f"\n{Fore.YELLOW}From your initial request and analysis result, we think the following company would be of your interest of trading: {updated_details.get('symbol')}.\n{Fore.RESET}")
+        confirm_symbol = input(f"{Fore.YELLOW}Is this the company you would like to trade? (y/n) {Fore.RESET}").strip()
+        if confirm_symbol != "y":
+            while True:
+                user_input = input(f"{Fore.YELLOW}\nEnter the stock symbol: {Fore.RESET}").strip()
+                if user_input:
+                    updated_details['symbol'] = user_input.upper()
+                    break
+                print(f"{Fore.RED}Symbol cannot be empty.{Fore.RESET}")
+
+    # Validate action
+    current_action = updated_details.get('action', '').lower()
+    if not current_action or current_action not in ['buy', 'sell'] or current_action == 'tbd':
+        while True:
+            user_input = input(f"{Fore.YELLOW}\nEnter the action (buy/sell): {Fore.RESET}").strip().lower()
+            if user_input in ['buy', 'sell']:
+                updated_details['action'] = user_input
+                break
+            print(f"{Fore.RED}Action must be either 'buy' or 'sell'.{Fore.RESET}")
+    else:
+        print(f"\n{Fore.YELLOW}From your initial request and analysis result, it looks like you want to initiate a {updated_details.get('action', '').lower()} action.{Fore.RESET}")
+        confirm_action = input(f"{Fore.YELLOW}Can you confirm that you want to execute a {"buying" if updated_details.get('action', '').lower() == "buy" else "selling"} action? (y/n) {Fore.RESET}").strip()
+        if confirm_action != "y":
+            while True:
+                user_input = input(f"{Fore.YELLOW}\nEnter the action (buy/sell): {Fore.RESET}").strip().lower()
+                if user_input in ['buy', 'sell']:
+                    updated_details['action'] = user_input
+                    break
+                print(f"{Fore.RED}Action must be either 'buy' or 'sell'.{Fore.RESET}")
 
     # Validate quantity
     current_quantity = updated_details.get('quantity')
@@ -241,7 +272,7 @@ async def validate_trade_info(trade_details: dict) -> dict:
         current_quantity == 'TBD'
     ):
         while True:
-            user_input = input(f"{Fore.YELLOW}Enter the quantity to trade: {Fore.RESET}").strip()
+            user_input = input(f"{Fore.YELLOW}\nEnter the quantity to trade: {Fore.RESET}").strip()
             try:
                 quantity = int(user_input)
                 if quantity <= 0:
@@ -251,16 +282,21 @@ async def validate_trade_info(trade_details: dict) -> dict:
                 break
             except ValueError:
                 print(f"{Fore.RED}Please enter a valid number.{Fore.RESET}")
-
-    # Validate action
-    current_action = updated_details.get('action', '').lower()
-    if not current_action or current_action not in ['buy', 'sell'] or current_action == 'tbd':
-        while True:
-            user_input = input(f"{Fore.YELLOW}Enter the action (buy/sell): {Fore.RESET}").strip().lower()
-            if user_input in ['buy', 'sell']:
-                updated_details['action'] = user_input
-                break
-            print(f"{Fore.RED}Action must be either 'buy' or 'sell'.{Fore.RESET}")
+    else:
+        print(f"\n{Fore.YELLOW}From your initial request and analysis result, it looks like you want to perform {updated_details.get('action', '').lower()} action on {updated_details.get('quantity')} shares.{Fore.RESET}")
+        confirm_quantity = input(f"{Fore.YELLOW}Can you confirm a trade execution of {updated_details.get('quantity')} shares? (y/n) {Fore.RESET}").strip()
+        if confirm_quantity != "y":
+            while True:
+                user_input = input(f"{Fore.YELLOW}\nEnter the quantity to trade: {Fore.RESET}").strip()
+                try:
+                    quantity = int(user_input)
+                    if quantity <= 0:
+                        print(f"{Fore.RED}Quantity must be a positive number.{Fore.RESET}")
+                        continue
+                    updated_details['quantity'] = quantity
+                    break
+                except ValueError:
+                    print(f"{Fore.RED}Please enter a valid number.{Fore.RESET}")
 
     return updated_details
 

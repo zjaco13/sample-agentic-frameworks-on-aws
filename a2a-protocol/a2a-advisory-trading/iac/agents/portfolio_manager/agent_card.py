@@ -3,7 +3,7 @@ import os
 
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
+    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
     region = os.environ.get("AWS_REGION", "us-east-1")
 
     return {
@@ -13,7 +13,7 @@ def lambda_handler(event, context):
             "name": "PortfolioManagerAgent",
             "description": "Autonomously orchestrates market, risk, and trade analysis based on user goals.",
             "protocol": "A2A/1.0",
-            "capabilities": ["OrchestratePortfolioInsights"],
+            "skills": ["OrchestratePortfolioInsights"],
             "endpoints": {
                 "send": f"https://{domain}/dev/tasks/send"
             },

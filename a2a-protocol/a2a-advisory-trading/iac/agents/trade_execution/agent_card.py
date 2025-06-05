@@ -12,7 +12,7 @@ def lambda_handler(event, context):
             "name": "TradeExecutionAgent",
             "description": "Executes trades and logs them to DynamoDB.",
             "protocol": "A2A/1.0",
-            "capabilities": ["ExecuteTrade"],
+            "skills": ["ExecuteTrade"],
             "endpoints": {
                 "send": f"https://{domain}/dev/tasks/send"
             },
