@@ -55,13 +55,15 @@ class PortfolioManagerAgent:
 
             # Phase 1: Initial Analysis
             plan = self._decompose_task(input_data)
-            user_link = self._user_http_link(input_data)
-            # http_request MCP: For local use only
-            extra_context = {}
-            if user_link.get("found_links") and user_link.get("valid"):
-                links = user_link.get("found_links")
-                for i in range(len(links)):
-                    extra_context[f"link{i+1}"] = self._extra_context(links[i])
+            '''
+                http_request MCP: For local use only
+            '''
+            # user_link = self._user_http_link(input_data)
+            # extra_context = {}
+            # if user_link.get("found_links") and user_link.get("valid"):
+            #     links = user_link.get("found_links")
+            #     for i in range(len(links)):
+            #         extra_context[f"link{i+1}"] = self._extra_context(links[i])
 
             routing_table = await discover_agent_cards()
 
