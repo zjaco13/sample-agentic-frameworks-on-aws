@@ -205,4 +205,4 @@ This architecture pattern is particularly valuable for scenarios requiring:
 ## Next Steps 
 - [Demo Walkthrough](docs/main/demo_flow.md)
 - [AWS Solution Deployment](docs/main/solution_deployment.md)
-- [Development Guide](docs/main/development_guide)
+- [Development Guide](docs/main/development_guide.md)

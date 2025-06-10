@@ -13,6 +13,7 @@ The application follows a serverless-first architecture deployed on AWS:
 - [Using the CLI](#using-the-cli)
 - [Testing Agents Logic](#testing-agents-logic)
 - [Service Quota](#service-quota-for-api-gateway-integration)
+- [Solutions Adoption](#solution-adoption)
 
 ## Installation
 
@@ -236,8 +237,11 @@ Workflow:
 
 ### Service Quota for API Gateway Integration
 
-Amazon API Gateway has a default maximum integration timeout of 29 seconds (29,000 milliseconds). While this limit can be increased through service quota requests, our solution has been architected to operate efficiently within this constraint through careful optimization. We have implemented asynchronous operations where possible and selected lightweight foundation models to ensure rapid response times while maintaining high-quality outputs.
+Amazon API Gateway has a default maximum integration timeout of 29 seconds (29,000 milliseconds). While this limit can be increased through service quota requests, our solution has been architected to operate efficiently within this constraint through careful optimization. We have implemented asynchronous operations where possible and selected lightweight foundation model to ensure rapid response times while maintaining high-quality outputs.
 
 For most standard use cases with well-defined, concise inputs, you should experience smooth operation with minimal to no throttling of the agent processes. Our system performs optimally with focused queries and clear user profile contexts that maintain reasonable token counts.
 
-However, if you plan to process extensive user profile data, handle complex multi-part queries, or require comprehensive market analysis, you may need to request a service quota increase. This is particularly relevant when dealing with large context windows or detailed market analyses. Our system will notify you if a request approaches or exceeds current timeout limits, allowing you to either adjust your input parameters or proceed with requesting appropriate quota increases to accommodate your specific needs.
+However, if you plan to process extensive user profile data, handle complex multi-part queries, or require comprehensive market analysis, you may need to request a service quota increase. This is particularly relevant when dealing with large context windows or detailed market analyses. 
+
+### Solution Adoption
+Organizations adopting this solution should establish proper security protocols including but not limited to guardrails, unit testing, integration testing, and encryption. Adopters must follow engineering best practices and implement secure LLM training practices with their own domain-specific data to ensure relevancy and accuracy.
