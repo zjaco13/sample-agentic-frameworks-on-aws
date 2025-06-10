@@ -16,6 +16,9 @@ This guidance would address:
 ## Table of Content
 - [Installation](#installation)
 - [Local Setup Pre-requisite](#local-setup-pre-requisite)
+- [Understand Local Servers Configuration](#understand-local-servers-configuration)
+  - [Path Configuration](#path-configuration) 
+  - [Local Agent Discovery](#local-agent-discovery)
 - [Running the Servers](#running-the-servers)
 - [Testing Agents](#testing-agents)
 - [Using MCP Tools](#using-mcp-tools)
@@ -34,7 +37,7 @@ cd a2a-protocols/a2a-advisory-trading
 
 ## Local Setup Pre-requisite
 
-* [Python >= 3.10](https://www.python.org/downloads/)
+* [Python >= 3.12](https://www.python.org/downloads/)
 * [PIP >= 25.0.1](https://pypi.org/project/pip/)
 * On the Console, make sure Amazon BedRock has enabled access to your model of choice
 * Install uvicorn
@@ -63,27 +66,29 @@ python -m venv venv
 * Create the `.env` in the project root directory (`a2a-advisory-trading/`) file with the following information:
 ```
   APP_NAME=adt
-  ENV_NAME=dev
+  ENV_NAME=local
   AWS_REGION=us-east-1
-  BEDROCK_MODEL_IS=your-bedrock-model-id
+  BEDROCK_MODEL_ID=your-bedrock-model-id
   AWS_ACCESS_KEY_ID=your-access-key-id
   AWS_SECRET_ACCESS_KEY=your-secret-access-key
-  TRADE_LOG_TABLE=your-dynamodb-table-for-trade-logging
+  TRADE_LOG_TABLE=your-dynamodb-table-for-trade-logging (optional)
 ```
+
+* Note: `TRADE_LOG_TABLE` is optional. You only need to deploy a DynamoDB and specify this value if you want to develop and test the logic of trade execution.
 
 #### Environment Variables Explanation
 
-| Variable              | Description                            | Example                      |
-|-----------------------|----------------------------------------|------------------------------| 
-| APP_NAME              | Application identifier                 | `adt`                        |
-| ENV_NAME              | Environment name                       | `dev`, `staging`, `prod`     |
-| AWS_REGION            | AWS region for services                | `us-east-1`                  |
-| BEDROCK_MODEL_IS      | Your Amazon Bedrock model ID	          | `anthropic.claude-v2`        |
-| AWS_ACCESS_KEY_ID     | 	AWS access key                        | From AWS IAM                 |
-| AWS_SECRET_ACCESS_KEY | 	AWS secret key                        | From AWS IAM                 |
-| TRADE_LOG_TABLE       | 	DynamoDB table name for trade logging | `adt-dev-trade-execution`    |
+| Variable                   | Description                           | Example                      |
+|----------------------------|---------------------------------------|------------------------------| 
+| APP_NAME                   | Application identifier                | `adt`                        |
+| ENV_NAME                   | Environment name                      | `dev`, `staging`, `prod`     |
+| AWS_REGION                 | AWS region for services               | `us-east-1`                  |
+| BEDROCK_MODEL_ID           | Your Amazon Bedrock model ID	         | `anthropic.claude-v2`        |
+| AWS_ACCESS_KEY_ID          | AWS access key                        | From AWS IAM                 |
+| AWS_SECRET_ACCESS_KEY      | AWS secret key                        | From AWS IAM                 |
+| TRADE_LOG_TABLE (optional) | DynamoDB table name for trade logging | `adt-local-trade-execution`    |
 
-#### DynamoDB Table Configuration
+#### DynamoDB Table Configuration for Trade Execution
 
 **Note**: The `TRADE_LOG_TABLE` setting requires special attention:
 
@@ -105,6 +110,37 @@ python init_dynamodb.py
 Important Notes: 
 - Ensure your DynamoDB table is in the same region as other AWS services
 - Verify your AWS credentials have appropriate permissions for DynamoDB operations
+
+## Understand Local Servers Configuration
+
+#### Path Configuration
+
+- The project uses path configuration to help local servers find and run the main code located in the /agents directory
+- You can find these path configurations in two places:
+  - `local_servers/config.py`
+  - All server files named `local_server_{agent}.py`
+- Each server file contains this important path setup code:
+```python
+current_dir = Path(__file__).parent    # Gets the current file's directory
+root_dir = current_dir.parent          # Gets the project's root directory
+sys.path.insert(0, str(root_dir))      # Adds project root to Python's path
+```
+- You can customize these path settings to match your project's folder structure. For example:
+  - Change the number of `.parent` calls if your folders are organized differently
+  - Add more paths to `sys.path` if needed 
+  - Modify the root directory location to match your setup
+
+#### Local Agent Discovery
+- Local agents are discovered through agent card URLs listed in `a2a_core/agent_registry.py`:
+```python
+LOCAL_AGENT_CARD_URLS = [
+    "http://localhost:8000/.well-known/agent.json", # market analysis 
+    "http://localhost:8001/.well-known/agent.json", # risk assessment
+    "http://localhost:8002/.well-known/agent.json", # trade execution 
+    "http://localhost:8003/.well-known/agent.json"  # portfolio manager  
+]
+```
+- To manage agents: Simply add or remove URLs from this list, ensuring each agent has a unique port number
 
 ## Running the Servers
 
@@ -166,223 +202,245 @@ Below are the examples of the attributes we need to make the request to the serv
 - For market analysis agent: 
 
 ```
-curl -X POST "http://localhost:8000/task" \
+curl -X POST "http://localhost:8000/message/send" \
   -H "Content-Type: application/json" \
   -d '{
-        "task": {
-          "id": "market-test-001",
-          "input": {
-            "sector": "clean energy",
-            "focus": "investment risks",
-            "riskFactors": ["regulation", "supply chain disruption"],
-            "summaryLength": 100
+    "id": "market-test-001",
+    "method": "message/send",
+    "params": {
+      "skill": "market-summary",
+      "message": {
+        "id": "market-test-001",
+        "contextId": "session-001",
+        "status": {
+          "state": "submitted",
+          "timestamp": "2025-06-05T21:45:00Z"
+        },
+        "history": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "kind": "text",
+                "text": "Give me a risk assessment for the oil and gas sector in today'\''s market."
+              },
+              {
+                "kind": "data",
+                "data": {
+                  "sector": "oil and gas",
+                  "focus": "investment risks",
+                  "riskFactors": ["regulation", "supply chain disruption"],
+                  "summaryLength": 100
+                }
+              }
+            ],
+            "messageId": "msg-123",
+            "kind": "message"
           }
-        }
-      }'
+        ],
+        "artifacts": [],
+        "metadata": {},
+        "kind": "task"
+      }
+    }
+  }'
+
 ```
 
-- For risk assessment agent: 
+- For risk assessment agent - "asset" analysis type 
 ```
-curl -X POST  "http://localhost:8001/task" \
+curl -X POST "http://localhost:8001/message/send" \
   -H "Content-Type: application/json" \
   -d '{
-        "task": {
-           "id": "risk-task-001",
-           "input": {
-        "analysisType": "asset",
-        "timeHorizon": "6 months",
-        "capitalExposure": "100000",
-        "specificAsset": {
-            "symbol": "AAPL",
-            "quantity": "100",
-            "action": "buy"
-        }
+    "id": "risk-test-001",
+    "contextId": "session-001",
+    "status": {
+      "state": "submitted",
+      "timestamp": "2024-03-05T21:45:00Z"
+    },
+    "history": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "What'\''s the risk assessment for buying Tesla stock?"
+          },
+          {
+            "kind": "data",
+            "data": {
+              "analysisType": "asset",
+              "sector": "automotive",
+              "timeHorizon": "medium",
+              "capitalExposure": "moderate",
+              "specificAsset": {
+                "symbol": "TSLA",
+                "quantity": "100",
+                "action": "buy"
+              }
+            }
           }
-        }
-      }'
+        ],
+        "messageId": "msg-123",
+        "kind": "message"
+      }
+    ],
+    "artifacts": [],
+    "metadata": {},
+    "kind": "task"
+  }'
+```
+
+- For risk assessment agent - "sector" analysis type
+```
+curl -X POST "http://localhost:8001/message/send" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "risk-test-002",
+    "contextId": "session-001",
+    "status": {
+      "state": "submitted",
+      "timestamp": "2024-03-05T21:45:00Z"
+    },
+    "history": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "What are the risks in the technology sector?"
+          },
+          {
+            "kind": "data",
+            "data": {
+              "analysisType": "sector",
+              "sector": "technology",
+              "timeHorizon": "long",
+              "capitalExposure": "high"
+            }
+          }
+        ],
+        "messageId": "msg-124",
+        "kind": "message"
+      }
+    ],
+    "artifacts": [],
+    "metadata": {},
+    "kind": "task"
+  }'
+```
+
+- For risk assessment agent - "general" analysis type
+```
+curl -X POST "http://localhost:8001/message/send" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "risk-test-003",
+    "contextId": "session-001",
+    "status": {
+      "state": "submitted",
+      "timestamp": "2024-03-05T21:45:00Z"
+    },
+    "history": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "What'\''s the general market risk outlook?"
+          },
+          {
+            "kind": "data",
+            "data": {
+              "analysisType": "general",
+              "timeHorizon": "short",
+              "capitalExposure": "moderate"
+            }
+          }
+        ],
+        "messageId": "msg-125",
+        "kind": "message"
+      }
+    ],
+    "artifacts": [],
+    "metadata": {},
+    "kind": "task"
+  }'
 ```
 
 - For trade execution agent: 
 ```
-curl -X POST "http://localhost:8002/task" \
+curl -X POST "http://localhost:8002/message/send" \
   -H "Content-Type: application/json" \
   -d '{
-        "task": {
-          "id": "trade-debug-001",
-          "input": {
-            "action": "Buy",
-            "symbol": "AMZN",
-            "quantity": 10
+    "jsonrpc": "2.0",
+    "id": "test-trade-001",
+    "method": "message/send",
+    "params": {
+      "skill": "portfolio-orchestration",
+      "message": {
+        "id": "test-trade-001-executetrade",
+        "contextId": "test-trade-001",
+        "history": [
+          {
+            "role": "user",
+            "kind": "message",
+            "messageId": "user-msg-001",
+            "taskId": "test-trade-001",
+            "contextId": "test-trade-001",
+            "parts": [
+              { "kind": "text", "text": "Please execute a buy of 5 shares of AAPL", "metadata": {} },
+              { "kind": "data", "data": { "action": "buy", "symbol": "AAPL", "quantity": 5 }, "metadata": {} }
+            ]
           }
-        }
-      }'
+        ],
+        "trade_confirmation_phase": true,
+        "trade_details": {
+          "action": "buy",
+          "symbol": "AAPL",
+          "quantity": 5
+        },
+        "status": {
+          "state": "submitted",
+          "timestamp": "2025-06-09T19:00:00Z"
+        },
+        "created_at": "2025-06-09T19:00:00Z",
+        "modified_at": "2025-06-09T19:00:00Z",
+        "kind": "task"
+      }
+    }
+  }'
 ```
 
 - For portfolio manager agent:
 ```
-curl -X POST "http://localhost:8003/task" \
+curl -X POST "http://localhost:8003/message/send" \
   -H "Content-Type: application/json" \
   -d '{
-        "task": {
-          "id": "cli-test-003",
-          "input": {
-            "user_input": "What is the current market and risk situation of the healthcare industry for investment?"
-          }
-        }
-      }'
+    "user_input": "I want to know what is the current market and risk situation when investing in oil and gas."
+  }'
 ```
 
 
 #### Sample of successful curl command results 
 
-- For market analysis agent: 
-```json
-{
-    "id": "market-test-001",
-    "input": {
-        "sector": "clean energy",
-        "focus": "investment risks",
-        "riskFactors": [
-            "regulation",
-            "supply chain disruption"
-        ],
-        "summaryLength": 100
-    },
-    "output": {
-        "summary": "The clean energy market presents both opportunities and risks for investors. Key trends include growing global demand for renewable sources, technological advancements, and supportive government policies. However, the sector faces regulatory uncertainties, supply chain disruptions, and competition from traditional energy sources. Investors must carefully consider the risks, such as changes in renewable energy subsidies, raw material shortages, and the impact of geopolitical tensions on global trade. Despite these challenges, the long-term outlook for clean energy remains positive, driven by the urgent need to address climate change and the increasing cost-competitiveness of renewable technologies. Diversification and thorough risk assessment are crucial for investors navigating this dynamic and evolving market.",
-        "tags": [
-            "clean energy",
-            "renewable energy",
-            "technological advancements",
-            "government policies",
-            "regulatory uncertainties",
-            "supply chain disruptions",
-            "competition from traditional energy"
-        ],
-        "sentiment": "positive"
-    },
-    "status": "completed",
-    "messages": [],
-    "error": null,
-    "created_at": "2025-05-31T17:52:53.320431",
-    "modified_at": "2025-05-31T17:52:56.235887",
-    "requires_input": false,
-    "metadata": {}
-}
-```
+- For market analysis agent:
+  ![A2A sample MA](../images/adt-sample-market-analysis.png)
 
-- For risk assessment agent: 
+- For risk assessment agent - "asset" analysis type
+  ![A2A sample RA asset](../images/adt-sample-risk-assessment-asset.png)
 
-```json
-{
-    "id": "risk-task-001",
-    "input": {
-        "action": "Buy",
-        "symbol": "TSLA",
-        "quantity": 25,
-        "sector": "electric vehicles",
-        "priceVolatility": "high",
-        "timeHorizon": "short-term",
-        "marketConditions": "uncertain",
-        "capitalExposure": "moderate"
-    },
-    "output": {
-        "score": 75,
-        "rating": "Moderate",
-        "factors": [
-            "rising_interest_rates",
-            "geopolitical_tensions",
-            "inflationary_pressures"
-        ],
-        "explanation": "The current market environment presents moderate risk for short-term investments with moderate capital exposure. Factors such as rising interest rates, geopolitical tensions, and persistent inflationary pressures are contributing to increased market volatility and economic uncertainty. While the overall market outlook remains cautious, diversification and close monitoring of macroeconomic indicators can help mitigate the potential impact of these risks."
-    },
-    "status": "completed",
-    "messages": [],
-    "error": null,
-    "created_at": "2025-05-31T19:01:18.148797",
-    "modified_at": "2025-05-31T19:01:19.913096",
-    "requires_input": false,
-    "metadata": {}
-}
-```
+- For risk assessment agent - "sector" analysis type
+  ![A2A sample RA sector](../images/adt-sample-risk-assessment-sector.png)
 
-- For trade execution agent: 
-```json
-{
-    "id": "trade-debug-001",
-    "input": {
-        "action": "Buy",
-        "symbol": "AMZN",
-        "quantity": 10
-    },
-    "output": {
-        "status": "executed",
-        "confirmationId": "TRADE-1CE93C2E"
-    },
-    "status": "completed",
-    "messages": [],
-    "error": null,
-    "created_at": "2025-05-31T18:56:26.022748",
-    "modified_at": "2025-05-31T18:56:26.506165",
-    "requires_input": false,
-    "metadata": {}
-}
-```
+- For risk assessment agent - "general" analysis type
+  ![A2A sample RA general](../images/adt-sample-risk-assessment-general.png)
 
-- For portfolio manager agent: 
-```json
-{
-    "id": "cli-test-003",
-    "input": {
-        "user_input": "What is the current market and risk situation of the healthcare industry for investment?"
-    },
-    "output": {
-        "status": "pending",
-        "analysis_results": {
-            "MarketSummary": {
-                "status": "completed",
-                "response": {
-                    "summary": "The healthcare sector has faced a complex market environment in recent times. The COVID-19 pandemic has significantly impacted the industry, leading to increased demand for healthcare services and products, but also supply chain disruptions and financial pressures.\n\nKey trends include the growing emphasis on telehealth and digital healthcare solutions, the rise of personalized medicine, and the continued focus on cost-effective and value-based care. Opportunities lie in the development of innovative treatments, the expansion of healthcare access, and the integration of technology to enhance patient outcomes.\n\nHowever, the sector also faces several risks, including regulatory changes (T), potential reimbursement challenges (B), and the ongoing threat of disease outbreaks and pandemics (D). Navigating these uncertainties requires healthcare companies to be agile, adaptable, and focused on building resilience within their operations and supply chains.",
-                    "tags": [
-                        "healthcare",
-                        "telehealth",
-                        "personalized medicine",
-                        "value-based care"
-                    ],
-                    "sentiment": "neutral"
-                }
-            },
-            "RiskEvaluation": {
-                "status": "completed",
-                "response": {
-                    "score": 75,
-                    "rating": "Moderate",
-                    "factors": [
-                        "sector_volatility",
-                        "regulatory_risks",
-                        "economic_uncertainty"
-                    ],
-                    "explanation": "The healthcare sector faces a moderate level of risk due to several factors. Sector volatility is a concern, as the industry is sensitive to changes in government policies, technological advancements, and consumer preferences. The regulatory environment also poses risks, with ongoing debates around healthcare reform and potential changes to reimbursement models. Additionally, the overall economic uncertainty stemming from factors like inflation, interest rate fluctuations, and geopolitical tensions can impact the sector's performance. While the healthcare industry is generally considered defensive, these factors warrant a moderate risk assessment for the given time horizon and capital exposure."
-                }
-            }
-        },
-        "trade_details": {},
-        "session_id": "cli-test-003",
-        "summary": "✅ MarketSummary completed | ✅ RiskEvaluation completed",
-        "delegated_tasks": [
-            "MarketSummary",
-            "RiskEvaluation"
-        ]
-    },
-    "status": "completed",
-    "messages": [],
-    "error": null,
-    "created_at": "2025-05-31T19:05:49.373718",
-    "modified_at": "2025-05-31T19:05:55.534811",
-    "requires_input": false,
-    "metadata": {}
-}
-```
+- For trade execution agent:
+  ![A2A sample TE](../images/adt-sample-trade-execution.png)
+
+- For portfolio manager agent:
+  ![A2A sample PM](../images/adt-sample-portfolio-manager.png)
 
 ## Using MCP Tools
 
@@ -390,7 +448,6 @@ To use the MCP tools suggested in the solution (Python Repl and http_request):
 
 ### For Python Repl 
 - Set `BYPASS_TOOL_CONSENT = true` in local environment to enable automatic approval
-- Uncomment implemented code in the start of phase 2 - execute trade 
 
 ### For http_request 
 - Pre-requisite: Make sure you have defined and listed all necessary access to provided resources in local environment 

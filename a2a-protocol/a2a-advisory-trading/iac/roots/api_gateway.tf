@@ -3,19 +3,19 @@ resource "aws_api_gateway_rest_api" "agent_api" {
   description = "API Gateway for ${var.agent_name}"
 }
 
-resource "aws_api_gateway_resource" "tasks" {
+resource "aws_api_gateway_resource" "messages" {
   rest_api_id = aws_api_gateway_rest_api.agent_api.id
   parent_id   = aws_api_gateway_rest_api.agent_api.root_resource_id
-  path_part   = "tasks"
+  path_part   = "message"
 }
 
 resource "aws_api_gateway_resource" "send" {
   rest_api_id = aws_api_gateway_rest_api.agent_api.id
-  parent_id   = aws_api_gateway_resource.tasks.id
+  parent_id   = aws_api_gateway_resource.messages.id
   path_part   = "send"
 
   depends_on = [
-    aws_api_gateway_resource.tasks
+    aws_api_gateway_resource.messages
   ]
 }
 
@@ -65,7 +65,7 @@ resource "aws_api_gateway_deployment" "deployment" {
 }
 
 resource "aws_api_gateway_stage" "stage" {
-  stage_name    = "dev"
+  stage_name    = var.env_name
   rest_api_id   = aws_api_gateway_rest_api.agent_api.id
   deployment_id = aws_api_gateway_deployment.deployment.id
 }

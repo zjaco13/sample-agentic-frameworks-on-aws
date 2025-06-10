@@ -1,35 +1,56 @@
-import json
 import os
+from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentProvider
 
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    env = event['requestContext'].get('env', 'dev')
+
+    skill = AgentSkill(
+        id="portfolio-orchestration",
+        name="Portfolio Orchestration",
+        description=(
+            "Orchestrates comprehensive portfolio management by coordinating market analysis, "
+            "risk assessment, and trade execution. Analyzes user investment goals and constraints "
+            "to provide holistic portfolio insights and recommendations through coordinated "
+            "agent interactions."
+        ),
+        tags=["finance", "portfolio", "orchestration", "analysis", "aws"],
+        examples=[
+            "Analyze the current industry and its relevant risk ",
+            "Considering my personal financial profile, what is the market situation and my risk to invest in 100 shares in XYZ?",
+            "Coordinate risk assessment and trade execution for portfolio rebalancing"
+        ],
+        inputModes=["text"],
+        outputModes=["text"]
+    )
+
+    agent_card = AgentCard(
+        name="PortfolioManagerAgent",
+        description=(
+            "Orchestrates portfolio management decisions by coordinating multiple specialized agents "
+            "using Amazon Bedrock foundation models. Provides comprehensive portfolio insights through "
+            "synchronized market analysis, risk assessment, and trade execution."
+        ),
+        url=f"https://{domain}/{env}/message/send",
+        provider=AgentProvider(
+            organization="AWS Sample Agentic Team",
+            url="https://aws.amazon.com/bedrock/"
+        ),
+        version="1.0.0",
+        documentationUrl="https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html",
+        capabilities=AgentCapabilities(
+            streaming=False,
+            pushNotifications=False,
+            stateTransitionHistory=False
+        ),
+        defaultInputModes=["text"],
+        defaultOutputModes=["text"],
+        skills=[skill],
+        supportsAuthenticatedExtendedCard=False
+    )
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "id": "portfolio-manager-agent",
-            "name": "PortfolioManagerAgent",
-            "description": "Autonomously orchestrates market, risk, and trade analysis based on user goals.",
-            "protocol": "A2A/1.0",
-            "skills": ["OrchestratePortfolioInsights"],
-            "endpoints": {
-                "send": f"https://{domain}/dev/tasks/send"
-            },
-            "metadata": {
-                "streaming": True,
-                "modelId": model_id,
-                "region": region,
-                "provider": "Bedrock/Anthropic",
-                "agent_type": "orchestrator",
-                "observability": {
-                    "logs": True,
-                    "traceability": True
-                }
-            }
-        }),
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "body": agent_card.model_dump_json(),
+        "headers": {"Content-Type": "application/json"}
     }

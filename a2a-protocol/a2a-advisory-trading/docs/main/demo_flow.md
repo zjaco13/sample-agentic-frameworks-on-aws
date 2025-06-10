@@ -33,11 +33,9 @@ Portfolio Manager then delegates task to Trade Execution.
 ![A2A Advisory Trading Demo](../demo/adt-demo-screenshot-07.png)
 
 Once a trade is confirmed, user can see its execution history written to the DynamoDB.
-(Note: User should have access to view CloudWatch to access the link)
 
 ![A2A Advisory Trading Demo](../demo/adt-demo-screenshot-08.png)
 
 User can review all agents activities and input history by clicking on CloudWatch log groups.
-(Note: User should have access to view CloudWatch to access the links)
 
 ![A2A Advisory Trading Demo](../demo/adt-demo-screenshot-09.png)
