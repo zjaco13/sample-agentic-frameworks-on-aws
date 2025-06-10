@@ -34,7 +34,7 @@ cd a2a-protocols/a2a-advisory-trading
 * [Python >= 3.12](https://www.python.org/downloads/)
 * [PIP >= 25.0.1](https://pypi.org/project/pip/)
 * [make](https://www.gnu.org/software/make/)
-* On the Console, make sure Amazon BedRock has enabled access to `Claude 3 Haiku`
+* On the Console, make sure Amazon BedRock has enabled access to `Claude 3 Haiku 3.5`
 * Install the following libraries for the CLI start:
 ```python
 pip install pyfiglet colorama halo aiohttp boto3
