@@ -9,3 +9,4 @@ pydantic-core>=2.0.0
 strands-agents==0.1.0
 strands-agents-tools==0.1.0
 typing-extensions>=4.6.1
+a2a-sdk>=0.0.1

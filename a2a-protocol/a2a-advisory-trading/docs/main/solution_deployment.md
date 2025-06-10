@@ -31,7 +31,7 @@ cd a2a-protocols/a2a-advisory-trading
 * [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 * [Terraform >= 1.8.0](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 * [Git CLI](https://git-scm.com/downloads)
-* [Python >= 3.10](https://www.python.org/downloads/)
+* [Python >= 3.12](https://www.python.org/downloads/)
 * [PIP >= 25.0.1](https://pypi.org/project/pip/)
 * [make](https://www.gnu.org/software/make/)
 * On the Console, make sure Amazon BedRock has enabled access to `Claude 3 Haiku`
@@ -73,13 +73,13 @@ To deploy the solutions, run the following in order at the root project:
 
 To destroy any module, run the following command:
 
-| Order | Command                           | Purpose                                  |
-|-------|-----------------------------------|------------------------------------------|
-| 1     | `make destroy-core`               | Destroy bucket deployed for dependencies |
-| 3     | `make destroy-market-analysis`    | Destroy market analysis agent            |
-| 4     | `make destroy-risk-assessment`    | Destroy risk assessment agent            |
-| 5     | `make destroy-trade-execution`    | Destroy trade execution agent            |
-| 6     | `make destroy-portfolio-manager`  | Destroy portfolio manager agent          |
+| Order | Command                           | Purpose                                           |
+|-------|-----------------------------------|---------------------------------------------------|
+| 1     | `make destroy-core`               | Clean up temporary files for new layer deployment |
+| 3     | `make destroy-market-analysis`    | Destroy market analysis agent                     |
+| 4     | `make destroy-risk-assessment`    | Destroy risk assessment agent                     |
+| 5     | `make destroy-trade-execution`    | Destroy trade execution agent                     |
+| 6     | `make destroy-portfolio-manager`  | Destroy portfolio manager agent                   |
 ---
 
 Once the infrastructure has been set up, run the following command at the project root to start the program:

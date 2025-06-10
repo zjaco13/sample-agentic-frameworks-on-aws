@@ -104,6 +104,8 @@ resource "aws_lambda_function" "agent_card_lambda" {
     }
   }
 
+  layers = var.custom_layer
+
   depends_on = [
     aws_s3_object.lambda_zip_card,
     aws_iam_role_policy_attachment.lambda_basic_execution,

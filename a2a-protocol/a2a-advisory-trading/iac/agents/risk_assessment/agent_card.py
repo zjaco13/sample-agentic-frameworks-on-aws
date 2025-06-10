@@ -1,30 +1,51 @@
-import json
-import os
+from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentProvider
 
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
-    region = os.environ.get("AWS_REGION", "us-east-1")
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
+    env = event['requestContext'].get('env', 'dev')
+
+    skill = AgentSkill(
+        id="risk-evaluation",
+        name="Risk Evaluation",
+        description=(
+            "Performs comprehensive risk assessments for financial instruments and markets, "
+            "analyzing potential threats, vulnerabilities, and risk factors. Provides actionable "
+            "insights for risk-aware trading decisions. Assess risk of investment in relation to a "
+            "investor profile or individual financial context."
+        ),
+        tags=["finance", "risk", "analysis", "trading", "aws"],
+        examples=[
+            "Evaluate the risks in the oil and gas sector given current market conditions.",
+            "Assess the risk factors for emerging market investments.",
+            "Evaluate the risk of investment for an individual knowing their investment profile."
+        ],
+        inputModes=["text"],
+        outputModes=["text"]
+    )
+
+    agent_card = AgentCard(
+        name="RiskAssessmentAgent",
+        description="Provides detailed risk evaluations and assessments using Amazon Bedrock foundation models.",
+        url=f"https://{domain}/{env}/message/send",
+        provider=AgentProvider(
+            organization="AWS Sample Agentic Team",
+            url="https://aws.amazon.com/bedrock/"
+        ),
+        version="1.0.0",
+        documentationUrl="https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html",
+        capabilities=AgentCapabilities(
+            streaming=False,
+            pushNotifications=False,
+            stateTransitionHistory=False
+        ),
+        defaultInputModes=["text"],
+        defaultOutputModes=["text"],
+        skills=[skill],
+        supportsAuthenticatedExtendedCard=False,
+    )
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "id": "risk-assessment-agent",
-            "name": "RiskAssessmentAgent",
-            "description": "Provides risk evaluations for trade decisions using Bedrock.",
-            "protocol": "A2A/1.0",
-            "skills": ["RiskEvaluation"],
-            "endpoints": {
-                "send": f"https://{domain}/dev/tasks/send"
-            },
-            "metadata": {
-                "streaming": True,
-                "modelId": model_id,
-                "region": region,
-                "provider": "Bedrock/Anthropic"
-            }
-        }),
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "body": agent_card.model_dump_json(),
+        "headers": {"Content-Type": "application/json"}
     }
