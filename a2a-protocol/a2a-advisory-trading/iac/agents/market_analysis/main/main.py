@@ -1,17 +1,55 @@
 import os
 import re
 import json
-from typing import Optional
+import uuid
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 from strands import Agent as StrandsAgent
 from strands.models import BedrockModel
-from a2a_core import get_logger
-
-logger = get_logger({"agent": "MarketAnalysisAgent"})
+from a2a.types import Task, TaskStatus, TaskState, Message, Artifact, Role, TextPart, DataPart
 
 SYSTEM_PROMPT = (
     "You are a financial analyst. Provide clear, insightful market summaries. "
     "Answer the questions to the best of your model training data."
 )
+
+def extract_user_input_from_task(task: Task) -> Dict[str, Any]:
+    _input_data = {}
+
+    print(f"DEBUG: Received task: {task}")
+
+    if not task or not task.history:
+        print("DEBUG: No task or history found")
+        return {"error": "No task or history found"}
+
+    # Find the most recent user message
+    user_messages = [msg for msg in task.history if msg.role.value == "user"]
+    if not user_messages:
+        print("DEBUG: No user messages found")
+        return {"error": "No user messages found"}
+
+    latest_user_message = user_messages[-1]
+    print(f"DEBUG: Latest user message: {latest_user_message}")
+
+    # Process message parts
+    for part in latest_user_message.parts:
+        print(f"DEBUG: Processing part: {part}")
+        if part.root.kind == "text":
+            _input_data["userContext"] = part.root.text
+        if part.root.kind == "data" and part.root.data:
+            # Extract main data fields
+            data = part.root.data
+            _input_data["sector"] = data.get("sector", "UNKNOWN_SECTOR")
+            _input_data["focus"] = data.get("focus", "UNKNOWN_FOCUS")
+            _input_data["riskFactors"] = data.get("riskFactors", [])
+            _input_data["summaryLength"] = data.get("summaryLength", 200)
+            # Extract extra context if present
+            if "extraContext" in data:
+                _input_data["extraContext"] = data["extraContext"]
+
+    print(f"DEBUG: Extracted data: {_input_data}")
+    return _input_data
+
 
 class MarketAnalysisAgent:
     def __init__(self, model_id: Optional[str] = None, region: Optional[str] = None):
@@ -28,18 +66,16 @@ class MarketAnalysisAgent:
             system_prompt=SYSTEM_PROMPT
         )
 
-    def build_prompt(self, input_data):
-        user_context = input_data.get("userContext", None)
-        extra_context = input_data.get("extraContext", None)
-        sector = input_data.get("sector", "technology sector")
-        focus = input_data.get("focus", "overall outlook")
-        risk_factors = input_data.get("riskFactors", [])
-        summary_length = input_data.get("summaryLength", 150)
-
+    def build_prompt(self, input_: Dict[str, Any]) -> str:
+        extra_context = input_.get("extraContext", None)
+        user_context = input_.get("userContext", None)
+        sector = input_.get("sector", "technology sector")
+        focus = input_.get("focus", "overall outlook")
+        risk_factors = input_.get("riskFactors", [])
+        summary_length = input_.get("summaryLength", 150)
         risks = ", ".join(risk_factors) if risk_factors else "market uncertainty"
-
         prompt = (
-            f"Knowing the user request that was initially sent to the portfolio manager: {user_context}. "
+            f"Knowing the user request: {user_context}. "
             f"Write a concise, coherent, and natural-sounding market summary (about {summary_length} words) for the {sector} sector. "
             f"Focus on {focus}. Discuss key trends, opportunities, and threats in a single paragraph. "
             f"If the user request has the intention of making a trade but did not specify which stock or company, "
@@ -51,31 +87,100 @@ class MarketAnalysisAgent:
         '''
         For local use only
         '''
-        # if extra_context:
-        #     prompt.__add__(f"Here are some more additional context send by user: {extra_context}. Use this information as part of the analysis.")
-
+        if extra_context:
+            prompt += f" Here is more context: {extra_context}."
         return prompt
 
-    def analyze(self, input_data):
-        prompt = self.build_prompt(input_data)
-        logger.info("Sending prompt to Strands", {"prompt": prompt[:200]})
+    def analyze(self, task: Task) -> Task:
+        prompt_input = extract_user_input_from_task(task)
+
+        prompt = self.build_prompt(prompt_input)
 
         try:
             response = self.strands_agent(prompt)
             summary = str(response)
-            logger.info("Strands agent full response", {"response": str(summary)})
             tag_data = self.extract_tags(summary)
 
-            return {
-                "summary": summary,
-                "tags": tag_data.get("tags", []),
-                "sentiment": tag_data.get("sentiment", "unknown")
-            }
+            parts = [
+                {
+                    "kind": "text",
+                    "text": summary,
+                    "metadata": {}
+                },
+                {
+                    "kind": "data",
+                    "data": tag_data,
+                    "metadata": {}
+                }
+            ]
+            artifact = Artifact(
+                artifactId=str(uuid.uuid4()),
+                parts=parts,
+                name="Market Summary",
+                description="Summary and tags generated by LLM"
+            )
+            msg = Message(
+                role="agent",
+                parts=[TextPart(kind="text", text="Market summary successfully generated.", metadata={})],
+                messageId=str(uuid.uuid4()),
+                kind="message",
+                taskId=task.id,
+                contextId=getattr(task, "contextId", None)
+            )
+            status = TaskStatus(
+                state=TaskState.completed,
+                message=msg,
+                timestamp=datetime.utcnow().isoformat() + "Z"
+            )
+            task.status = status
+            task.artifacts = task.artifacts or []
+            task.artifacts.append(artifact)
+            if hasattr(task, "kind"):
+                task.kind = "task"
+            else:
+                setattr(task, "kind", "task")
         except Exception as e:
-            logger.error("Strands agent failed", {"error": str(e)})
-            return {"summary": "", "tags": [], "sentiment": "unknown"}
+            error_parts = [
+                {
+                    "kind": "text",
+                    "text": str(e),
+                    "metadata": {}
+                }
+            ]
 
-    def extract_tags(self, summary):
+            artifact = Artifact(
+                artifactId=str(uuid.uuid4()),
+                parts=error_parts,
+                name="Error",
+                description="Error encountered during market analysis"
+            )
+
+            error_msg = Message(
+                role="agent",
+                parts=error_parts,
+                messageId=str(uuid.uuid4()),
+                kind="message",
+                taskId=task.id,
+                contextId=getattr(task, "contextId", None)
+            )
+
+            status = TaskStatus(
+                state=TaskState.failed,
+                message=error_msg,
+                timestamp=datetime.utcnow().isoformat() + "Z"
+            )
+
+            task.status = status
+            task.artifacts = task.artifacts or []
+            task.artifacts.append(artifact)
+            if hasattr(task, "kind"):
+                task.kind = "task"
+            else:
+                setattr(task, "kind", "task")
+        return task
+
+
+    def extract_tags(self, summary: str) -> Dict[str, Any]:
         prompt = (
             "Analyze the following market summary and return exactly 4-7 key themes as a list of 'tags', "
             "and the overall sentiment (positive, neutral, or negative) for investors. "
@@ -86,33 +191,17 @@ class MarketAnalysisAgent:
         )
         try:
             result = str(self.strands_agent(prompt))
-
             try:
                 parsed = json.loads(result)
-                tags = parsed.get("tags", [])
-                sentiment = parsed.get("sentiment", "unknown")
-                if not isinstance(tags, list):
-                    tags = [tags] if tags else []
-                if not isinstance(sentiment, str):
-                    sentiment = str(sentiment)
-                return {"tags": tags, "sentiment": sentiment}
-            except Exception as direct_parse_error:
-                match = re.search(r'\{[\s\S]*?\}', result)
-                if match:
-                    raw_json = match.group()
-                    try:
-                        parsed = json.loads(raw_json)
-                        tags = parsed.get("tags", [])
-                        sentiment = parsed.get("sentiment", "unknown")
-                        if not isinstance(tags, list):
-                            tags = [tags] if tags else []
-                        if not isinstance(sentiment, str):
-                            sentiment = str(sentiment)
-                        return {"tags": tags, "sentiment": sentiment}
-                    except Exception as e:
-                        logger.warning("Failed to parse tags JSON", {"error": str(e), "raw_json": raw_json})
-                logger.warning("No JSON found in tag extraction output", {"llm_output": result})
-                return {"tags": [], "sentiment": "unknown"}
+            except Exception:
+                match = re.search(r'\{[\s\S]*?}', result)
+                parsed = json.loads(match.group()) if match else {}
+            tags = parsed.get("tags", [])
+            sentiment = parsed.get("sentiment", "unknown")
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+            if not isinstance(sentiment, str):
+                sentiment = str(sentiment)
+            return {"tags": tags, "sentiment": sentiment}
         except Exception as e:
-            logger.error("Tag extraction failed (LLM or parse error)", {"error": str(e)})
             return {"tags": [], "sentiment": "unknown"}

@@ -47,7 +47,7 @@ deploy-core:
 	@cd iac/agents/layers && zip -r a2a_layer.zip python
 	@echo "Layer created successfully."
 
-clean:
+destroy-core:
 	@rm -rf $(LAYER_DIR)
 	@rm -f iac/agents/layers/a2a_layer.zip
 	@echo "Cleaned up temporary files."

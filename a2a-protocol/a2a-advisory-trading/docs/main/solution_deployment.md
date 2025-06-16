@@ -13,6 +13,7 @@ The application follows a serverless-first architecture deployed on AWS:
 - [Using the CLI](#using-the-cli)
 - [Testing Agents Logic](#testing-agents-logic)
 - [Service Quota](#service-quota-for-api-gateway-integration)
+- [Solutions Adoption](#solution-adoption)
 
 ## Installation
 
@@ -31,10 +32,10 @@ cd a2a-protocols/a2a-advisory-trading
 * [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 * [Terraform >= 1.8.0](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 * [Git CLI](https://git-scm.com/downloads)
-* [Python >= 3.10](https://www.python.org/downloads/)
+* [Python >= 3.12](https://www.python.org/downloads/)
 * [PIP >= 25.0.1](https://pypi.org/project/pip/)
 * [make](https://www.gnu.org/software/make/)
-* On the Console, make sure Amazon BedRock has enabled access to `Claude 3 Haiku`
+* On the Console, make sure Amazon BedRock has enabled access to `Claude 3.5 Haiku`
 * Install the following libraries for the CLI start:
 ```python
 pip install pyfiglet colorama halo aiohttp boto3
@@ -73,13 +74,13 @@ To deploy the solutions, run the following in order at the root project:
 
 To destroy any module, run the following command:
 
-| Order | Command                           | Purpose                                  |
-|-------|-----------------------------------|------------------------------------------|
-| 1     | `make destroy-core`               | Destroy bucket deployed for dependencies |
-| 3     | `make destroy-market-analysis`    | Destroy market analysis agent            |
-| 4     | `make destroy-risk-assessment`    | Destroy risk assessment agent            |
-| 5     | `make destroy-trade-execution`    | Destroy trade execution agent            |
-| 6     | `make destroy-portfolio-manager`  | Destroy portfolio manager agent          |
+| Order | Command                           | Purpose                                           |
+|-------|-----------------------------------|---------------------------------------------------|
+| 1     | `make destroy-core`               | Clean up temporary files for new layer deployment |
+| 3     | `make destroy-market-analysis`    | Destroy market analysis agent                     |
+| 4     | `make destroy-risk-assessment`    | Destroy risk assessment agent                     |
+| 5     | `make destroy-trade-execution`    | Destroy trade execution agent                     |
+| 6     | `make destroy-portfolio-manager`  | Destroy portfolio manager agent                   |
 ---
 
 Once the infrastructure has been set up, run the following command at the project root to start the program:
@@ -236,8 +237,11 @@ Workflow:
 
 ### Service Quota for API Gateway Integration
 
-Amazon API Gateway has a default maximum integration timeout of 29 seconds (29,000 milliseconds). While this limit can be increased through service quota requests, our solution has been architected to operate efficiently within this constraint through careful optimization. We have implemented asynchronous operations where possible and selected lightweight foundation models to ensure rapid response times while maintaining high-quality outputs.
+Amazon API Gateway has a default maximum integration timeout of 29 seconds (29,000 milliseconds). While this limit can be increased through service quota requests, our solution has been architected to operate efficiently within this constraint through careful optimization. We have implemented asynchronous operations where possible and selected lightweight foundation model to ensure rapid response times while maintaining high-quality outputs.
 
 For most standard use cases with well-defined, concise inputs, you should experience smooth operation with minimal to no throttling of the agent processes. Our system performs optimally with focused queries and clear user profile contexts that maintain reasonable token counts.
 
-However, if you plan to process extensive user profile data, handle complex multi-part queries, or require comprehensive market analysis, you may need to request a service quota increase. This is particularly relevant when dealing with large context windows or detailed market analyses. Our system will notify you if a request approaches or exceeds current timeout limits, allowing you to either adjust your input parameters or proceed with requesting appropriate quota increases to accommodate your specific needs.
+However, if you plan to process extensive user profile data, handle complex multi-part queries, or require comprehensive market analysis, you may need to request a service quota increase. This is particularly relevant when dealing with large context windows or detailed market analyses. 
+
+### Solution Adoption
+Organizations adopting this solution should establish proper security protocols including but not limited to guardrails, unit testing, integration testing, and encryption. Adopters must follow engineering best practices and implement secure LLM training practices with their own domain-specific data to ensure relevancy and accuracy.

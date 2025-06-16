@@ -20,7 +20,7 @@ The protocol essentially acts as a standardized language that allows AI agents t
 ## A2A Protocol + AWS
 
 ### [A2A Advisory Trading](a2a-adivsory-trading)
-Using the example of advisory trading, the project serves as a reference implementation demonstrating how to design and deploy multi-agent systems using Google's Agent2Agent Protocol on AWS through a serverless architecture, powered by Amazon Bedrock. It showcases practical patterns for building production-ready, stateful agent networks while leveraging cloud-native services.
+This project demonstrates the implementation of Google's Agent2Agent (A2A) Protocol in a serverless AWS environment, using advisory trading as a case study. It leverages the A2A SDK, Strands Agent, and Strands SDK's MCP tools to showcase how multi-agent systems can communicate effectively over HTTP while utilizing cloud-native services.
 
 ### Importing LLMs from Amazon Bedrock
 

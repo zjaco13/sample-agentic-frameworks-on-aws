@@ -1,76 +1,99 @@
-from datetime import datetime
 import json
-import logging
-from a2a_core import Task
+import uuid
+from datetime import datetime
+from a2a.types import Task, Message, Artifact, TaskStatus, TaskState
 from main import RiskAssessmentAgent
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+agent = RiskAssessmentAgent()
 
 def lambda_handler(event, context):
     try:
-        print("Risk assessment request received", {"event": event})
-        body = json.loads(event.get("body", "{}"))
-        task = Task.from_dict(body.get("task"))
+        # === Unwrap Lambda event body ===
+        if "body" in event and isinstance(event["body"], str):
+            body = json.loads(event["body"])
+        else:
+            body = event
 
-        if not task.input:
-            raise ValueError("Missing input data in task")
+        # === Unwrap A2A JSON-RPC envelope if present ===
+        if "method" in body and "params" in body and "message" in body["params"]:
+            request_id = body.get("id") or str(uuid.uuid4())
+            task_dict = body["params"]["message"]
+        else:
+            request_id = body.get("id") or str(uuid.uuid4())
+            task_dict = body.get("task") if "task" in body else body
 
-        analysis_type = task.input.get("analysisType", "general")
+        task = Task.model_validate(task_dict)
 
-        if analysis_type == "asset":
-            specific_asset = task.input.get("specificAsset", {})
-            if not specific_asset:
-                raise ValueError("Missing specificAsset data for asset analysis")
-            if not all(k in specific_asset for k in ["symbol", "quantity"]):
-                raise ValueError("Missing required fields in specificAsset")
+        result_task = agent.analyze(task)
 
-        elif analysis_type == "sector":
-            if not task.input.get("sector"):
-                raise ValueError("Missing sector for sector analysis")
-
-        agent = RiskAssessmentAgent()
-
-        risk_analysis = agent.analyze(task.input or {})
-
-        task.output = risk_analysis
-        task.status = "completed"
-        task.modified_at = datetime.utcnow().isoformat()
-
-        print("Risk assessment complete", {
-            "task_id": task.id,
-            "analysis_type": analysis_type,
-            "rating": risk_analysis.get("rating")
-        })
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps(task.to_dict()),  # Changed from task.json() to task.to_dict()
-            "headers": {
-                "Content-Type": "application/json"
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "message": result_task.model_dump(mode='json')
             }
         }
 
-    except ValueError as ve:
-        error_message = str(ve)
-        logger.error("Validation error", {"error": error_message})
         return {
-            "statusCode": 400,
-            "body": json.dumps({
-                "error": error_message,
-                "status": "failed"
-            }),
-            "headers": {"Content-Type": "application/json"}
+            "statusCode": 200,
+            "body": json.dumps(response)
         }
 
     except Exception as e:
-        error_message = str(e)
-        logger.error("Risk assessment failed", {"error": error_message})
+        try:
+            task_id = task.id if 'task' in locals() else str(uuid.uuid4())
+            context_id = getattr(task, "contextId", None) if 'task' in locals() else None
+        except Exception:
+            task_id = str(uuid.uuid4())
+            context_id = None
+
+        error_parts = [
+            {
+                "kind": "text",
+                "text": str(e),
+                "metadata": {}
+            }
+        ]
+
+        error_message = Message(
+            role="agent",
+            parts=error_parts,
+            messageId=str(uuid.uuid4()),
+            kind="message",
+            taskId=task_id,
+            contextId=str(context_id),
+        )
+
+        status = TaskStatus(
+            state=TaskState.failed,
+            message=error_message,
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+
+        error_artifact = Artifact(
+            artifactId=str(uuid.uuid4()),
+            parts=error_parts,
+            name="Error",
+            description="Error encountered during risk assessment"
+        )
+
+        error_task = Task(
+            id=task_id,
+            contextId=str(context_id),
+            status=status,
+            artifacts=[error_artifact],
+            kind="task"
+        )
+
+        response = {
+            "jsonrpc": "2.0",
+            "id": request_id if 'request_id' in locals() else str(uuid.uuid4()),
+            "result": {
+                "message": error_task.model_dump(mode='json')
+            }
+        }
+
         return {
             "statusCode": 500,
-            "body": json.dumps({
-                "error": error_message,
-                "status": "failed"
-            }),
-            "headers": {"Content-Type": "application/json"}
+            "body": json.dumps(response)
         }

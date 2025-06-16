@@ -1,15 +1,15 @@
 # A2A Advisory Trading
 
-A serverless multi-agent trading advisory system built on AWS, leveraging Google's Agent2Agent Protocol, Strands Agent, and built-in MCP tools from Strands SDK to deliver personalized investment analysis, risk assessment, and secure trade execution.
+A serverless multi-agent trading advisory system built on AWS, leveraging Google's Agent2Agent Protocol using a2a SDK, Strands Agent, and built-in MCP tools from Strands SDK to deliver personalized investment analysis, risk assessment, and secure trade execution.
 
 This project serves as a reference implementation demonstrating how to design and deploy multi-agent systems using Google's Agent2Agent Protocol on AWS through a serverless architecture, powered by Strands Agent and Amazon Bedrock. It showcases patterns for building agent networks while leveraging cloud-native services.
 
-![adt app](docs/demo/adt-demo-screenshot-01.png)
+![ADT APP](docs/demo/adt-demo-screenshot-01.png)
 
 ## Table of Content
 - [Key Features](#technical-stack)
-  - [Agent2Agent Protocol Implementation](#agent2agent-protocol-implementation)
-  - [Strands SDK for Bedrock Agent](#strands-sdk-for-bedrock-agent)
+  - [Agent2Agent Protocol Implementation with a2a SDK](#agent2agent-protocol-implementation-with-a2a-sdk)
+  - [Strands Agent Integration with Bedrock Model](#strands-agent-integration-with-bedrock-model)
   - [Strands Built-in MCP Integration](#strands-built-in-mcp-integration)
   - [Analysis Personalization](#analysis-personalization)
   - [Serverless Infrastructure](#serverless-infrastructure)
@@ -26,20 +26,27 @@ This project serves as a reference implementation demonstrating how to design an
 - [Developer Guide](docs/main/development_guide.md)
   - [Development Prerequisites](docs/main/development_guide.md#installation)
   - [Local Environment Setup](docs/main/development_guide.md#local-setup-pre-requisite)
+  - [Understand Local Servers Configuration](docs/main/development_guide.md#understand-local-servers-configuration)
+    - [Path Configuration](docs/main/development_guide.md#path-configuration)
+    - [Local Agent Discovery](docs/main/development_guide.md#local-agent-discovery)
   - [Running Agents Locally](docs/main/development_guide.md#running-the-servers)
   - [Agent Development and Testing](docs/main/development_guide.md#testing-agents)
   - [Using MCP Tools](docs/main/development_guide.md#using-mcp-tools)
 - [Demo](#demo)
-  - [Demo Walkthrough](docs/main/demo_flow.md)
+  - [Demo Flow](docs/main/demo_flow.md)
 - [Common Pattern Across Industries](#common-patterns-across-industries)
 
 ## Key Features
 
-#### Agent2Agent Protocol Implementation
-The platform leverages Google's Agent2Agent Protocol to enable:
+#### Agent2Agent Protocol Implementation with a2a SDK
+The platform leverages Google's Agent2Agent Protocol by using `a2a-sdk` to enable:
 - Structured agent-to-agent communication
 - Standardized agent discovery in a network of agents
 - Coordinated decision-making processes
+
+`a2a-sdk` is the official open-source Python SDK for compliance with A2A Protocol. 
+
+Refer to [Python SDK Reference](https://google-a2a.github.io/A2A/sdk/python/) for class definitions and detail documentation. 
 
 #### Strands Agent Integration with Bedrock Model:
 The platform leverages Amazon's Strands Agent to enable:
@@ -49,7 +56,6 @@ The platform leverages Amazon's Strands Agent to enable:
 
 #### Strands Built-in MCP Integration
 The platform leverages Strands' built-in MCP tools to enable:
-- Current time tool for consistent ISO timestamp generation
 - Built-in Python REPL tool for code execution and data processing
 - Built-in http request to make API calls, fetch web data, and call local HTTP servers
 - Note: The current solution only supports Python REPL and http request tool in local environment
@@ -89,6 +95,18 @@ This agent ecosystem ensures a structured workflow where the Portfolio Manager c
 ### A2A Protocol
 
 The implementation of Google's Agent2Agent Protocol as our communication framework ensures standardized and reliable interaction between agents. The protocol's structured communication patterns help maintain system integrity and ensure that all agents operate with consistent information and clear objectives.
+
+#### Agent Discovery using Registry 
+Agent discovery in our project is dynamic and environment-aware. When agents are hosted in the same AWS account, we use naming conventions and AWS APIs to automatically discover each agent’s API Gateway ID and construct their endpoints. 
+This lets the Portfolio Manager query each agent’s `/.well-known/agent.json` to get capabilities and metadata at runtime. 
+The discovery logic is implemented in `a2a_core/agent_registry.py`.
+
+For cross-account, cross-org, or cross-team deployments where automatic API ID discovery is not possible, our code can fall back to a static agent registry—a list or dictionary of known agent endpoints, which can be loaded from a config file, S3 bucket, or environment variable. 
+The registry logic in `agent_registry.py` checks the environment, and if dynamic discovery is not available or fails, it loads and uses the static registry instead as seen for local environment.
+This design allows seamless agent discovery in both single-account (fully automated) and multi-account (manual/static) scenarios.
+
+#### Task Delegation and Lifecycle 
+When a user submits a request (via cli.py), the Portfolio Manager creates a new Task object, decomposes it into subtasks (Market Analysis, Risk Assessment, Trade Execution), and delegates each to the correct agent using HTTP requests. Task states progress from submitted → in-progress → completed or failed. The PM waits for sub-agent responses, handles missing information or errors, and, for trades, prompts the user for confirmation before final execution. All interactions, results, and status changes are tracked and auditable.
 
 ### Lightweight Serverless Architecture
 
@@ -159,6 +177,7 @@ a2a-advisory-trading/
 │ │ │ │ └── main.py
 │ │ │ ├── agent_card.py
 │ │ │ ├── main.tf                         # Terraform parameters for infra deployment
+│ │ │ ├── dynamodb.tf                     # Terraform resources defined to deploy DynamoDB table 
 │ │ │ └── variables.tf                    # Variables used in the agent module
 │ ├── roots/                              # Shared terraform resource to deploy all agents infrastructure
 │ │ ├── api_gateway.tf
@@ -186,4 +205,4 @@ This architecture pattern is particularly valuable for scenarios requiring:
 ## Next Steps 
 - [Demo Walkthrough](docs/main/demo_flow.md)
 - [AWS Solution Deployment](docs/main/solution_deployment.md)
-- [Development Guide](docs/main/development_guide)
+- [Development Guide](docs/main/development_guide.md)
