@@ -12,7 +12,7 @@ import boto3
 NUM_QUESTIONS = "3"
 
 # Replace with your actual guardrail ID and version
-guardrail_id = "k4k67kbtf8eh"
+guardrail_id = "<your GuardRail ID Here>"
 guardrail_version = "2"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
@@ -22,7 +22,7 @@ logging.getLogger("strands").setLevel(logging.ERROR)
 #Replace with you LLama AP key
 model = LlamaAPIModel(
     client_args={
-        "api_key": "LLM|1438469257464983|Fpc81PXFEsZQfu_s3rvTo2GudDM",
+        "api_key": "<Your LLAMA API KEY HERE>",
     },
     # **model_config
     model_id="Llama-4-Maverick-17B-128E-Instruct-FP8"

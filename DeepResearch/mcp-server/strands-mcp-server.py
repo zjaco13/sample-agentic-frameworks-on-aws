@@ -10,13 +10,13 @@ from markitdown import MarkItDown
 from tavily import TavilyClient
 
 mcp = FastMCP("Calculator Server")
-mydirpath = "/Users/smithzgg/papers/"
+mydirpath = "<local Download Directory>"
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
 USER_AGENT = "weather-app/1.0"
 
 arxiv_client = arxiv.Client()
-tavily_client = TavilyClient(api_key="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")
+tavily_client = TavilyClient(api_key="<Your TAVILY API Key HERE")
 md = MarkItDown()
 
 async def make_nws_request(url: str) -> dict[str, Any] | None:
