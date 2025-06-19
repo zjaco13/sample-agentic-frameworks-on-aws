@@ -2,7 +2,7 @@ import React, { memo, useState, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChartLine, Copy, Check, Clock, Zap } from "lucide-react";
+import { ChartLine, Copy, Check, Clock, Zap, Download } from "lucide-react";
 import FilePreview from "@/components/FilePreview";
 import { ChartRenderer } from "@/components/ChartRenderer";
 import { Message } from '@/types/chat'; 
@@ -107,6 +107,31 @@ const MessageComponentBase: React.FC<MessageComponentProps> = ({ message }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Extract download links from the message text
+  const extractDownloadLinks = (text: string) => {
+    const downloadRegex = /Download available at: (\/api\/files\/download\/[^\s]+)/g;
+    const matches = [];
+    let match;
+    while ((match = downloadRegex.exec(text)) !== null) {
+      const downloadPath = match[1];
+      const filename = downloadPath.split('/').pop();
+      matches.push({ path: downloadPath, filename });
+    }
+    return matches;
+  };
+
+  const downloadLinks = extractDownloadLinks(textContent.text);
+
+  const handleDownload = (downloadPath: string, filename: string) => {
+    const fullUrl = `http://localhost:8000${downloadPath}`;
+    const link = document.createElement('a');
+    link.href = fullUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex items-start gap-3 my-4 group">
       {message.role === "assistant" && (
@@ -172,10 +197,28 @@ const MessageComponentBase: React.FC<MessageComponentProps> = ({ message }) => {
             )}
             
             {message.role === "assistant" && (
-              <div className="absolute -bottom-2 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute -bottom-2 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                 <Button size="icon" variant="ghost" className="h-6 w-6 bg-white dark:bg-gray-700 rounded-full shadow-sm" onClick={handleCopy}>
                   {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 </Button>
+              </div>
+            )}
+            
+            {/* Download buttons for files */}
+            {downloadLinks.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {downloadLinks.map((link, index) => (
+                  <Button
+                    key={index}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => handleDownload(link.path, link.filename || 'document')}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download {link.filename}
+                  </Button>
+                ))}
               </div>
             )}
           </div>

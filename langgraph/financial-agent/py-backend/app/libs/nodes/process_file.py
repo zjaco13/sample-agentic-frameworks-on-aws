@@ -25,6 +25,6 @@ async def process_file(state: GraphState) -> GraphState:
         content="Starting file processing"
     )
     
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1.0)
 
     return new_state

@@ -281,19 +281,13 @@ async def yahoo_market_data(indices: List[str] = None) -> str:
 def main():
     """Main function to run the server"""
     parser = argparse.ArgumentParser(description='Run Yahoo Finance MCP server')
-    parser.add_argument('--sse', action='store_true', help='Use SSE transport')
     parser.add_argument('--port', type=int, default=8083, help='Port to run the server on')
     
     args = parser.parse_args()
     
-    if args.sse:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Yahoo Finance server with SSE transport on port {args.port}")
-        mcp.run(transport='sse')
-    else:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Yahoo Finance server on port {args.port}")
-        mcp.run()
+    mcp.settings.port = args.port
+    logger.info(f"Starting Yahoo Finance server with Streamable HTTP transport on port {args.port}")
+    mcp.run(transport='streamable-http')
 
 if __name__ == "__main__":
     main()

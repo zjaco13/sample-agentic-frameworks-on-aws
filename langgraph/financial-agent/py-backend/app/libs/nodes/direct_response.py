@@ -9,7 +9,7 @@ from langgraph.graph import END
 logger = logging.getLogger(__name__)
 
 @with_thought_callback(category="analysis", node_name="DirectResponse")
-def direct_response(state: GraphState) -> GraphState:  
+def handle_chat(state: GraphState) -> GraphState:  
     logger.info("Direct Response node: Generating response...")
     
     new_state = state.copy()

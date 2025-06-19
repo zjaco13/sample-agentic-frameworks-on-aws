@@ -19,7 +19,8 @@ resource "aws_lambda_function" "agent_handler_lambda" {
   function_name = "${var.app_name}-${var.env_name}-${var.agent_name}"
   role          = aws_iam_role.lambda_exec.arn
   handler       = "handler.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
+  architectures = ["arm64"]
   timeout       = var.timeout
   memory_size   = var.memory_size
   s3_bucket     = var.lambda_bucket_handler
@@ -28,7 +29,7 @@ resource "aws_lambda_function" "agent_handler_lambda" {
   environment {
     variables = merge(
       {
-        CAPABILITIES       = join(",", var.capabilities)
+        SKILLS             = join(",", var.skills)
         AWS_PRIMARY_REGION = var.aws_region
         BEDROCK_MODEL_ID   = var.bedrock_model_id
       },
@@ -89,7 +90,8 @@ resource "aws_lambda_function" "agent_card_lambda" {
   function_name = "${var.app_name}-${var.env_name}-${var.agent_name}-card-handler"
   role          = aws_iam_role.lambda_exec.arn
   handler       = "agent_card.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
+  architectures = ["arm64"]
   timeout       = var.timeout
   memory_size   = var.memory_size
   s3_bucket     = var.lambda_bucket_card
@@ -101,6 +103,8 @@ resource "aws_lambda_function" "agent_card_lambda" {
       BEDROCK_MODEL_ID   = var.bedrock_model_id
     }
   }
+
+  layers = var.custom_layer
 
   depends_on = [
     aws_s3_object.lambda_zip_card,

@@ -193,71 +193,16 @@ async def web_search(
         logger.error(f"Error in web_search: {e}")
         return f"Error performing web search: {str(e)}"
 
-# @mcp.tool()
-# async def summarize_webpage(
-#     url: str = Field(description="URL of the webpage to summarize")
-# ) -> str:
-#     """Fetch and summarize the content of a webpage."""
-#     logger.info(f"summarize_webpage called with URL: {url}")
-#     try:
-#         async with httpx.AsyncClient(follow_redirects=True) as client:
-#             headers = {
-#                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-#             }
-#             response = await client.get(url, headers=headers, timeout=30.0)
-#             response.raise_for_status()
-            
-#             soup = BeautifulSoup(response.text, 'html.parser')
-            
-#             title = soup.title.string if soup.title else "Untitled Page"
-            
-#             site_name = ""
-#             meta_site_name = soup.find("meta", property="og:site_name")
-#             if meta_site_name and meta_site_name.get("content"):
-#                 site_name = meta_site_name.get("content")
-            
-#             for script in soup(["script", "style", "meta", "link"]):
-#                 script.extract()
-                
-#             text = soup.get_text()
-            
-#             lines = (line.strip() for line in text.splitlines())
-#             chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-#             text = '\n'.join(chunk for chunk in chunks if chunk)
-            
-#             content = text[:8000] if len(text) > 8000 else text
-            
-#             summary = f"Webpage Summary: {title}\n\n"
-#             if site_name:
-#                 summary += f"Source: {site_name}\n"
-#             summary += f"URL: {url}\n\n"
-            
-#             summary += "Content Preview:\n"
-#             preview_text = content[:3000] + "..." if len(content) > 3000 else content
-#             summary += preview_text
-            
-#             return summary
-            
-#     except Exception as e:
-#         logger.error(f"Error summarizing webpage: {e}")
-#         return f"Error fetching or summarizing webpage {url}: {str(e)}"
-
 def main():
     parser = argparse.ArgumentParser(description='Run Financial News MCP server')
-    parser.add_argument('--sse', action='store_true', help='Use SSE transport')
     parser.add_argument('--port', type=int, default=8085, help='Port to run the server on')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
     
     args = parser.parse_args()
     
-    if args.sse:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Financial News server with SSE transport on port {args.port}")
-        mcp.run(transport='sse')
-    else:
-        mcp.settings.port = args.port
-        logger.info(f"Starting Financial News server on port {args.port}")
-        mcp.run()
+    mcp.settings.port = args.port
+    logger.info(f"Starting Financial News server with Streamable HTTP transport on port {args.port}")
+    mcp.run(transport='streamable-http')
 
 if __name__ == "__main__":
     main()

@@ -9,7 +9,7 @@ from app.libs.decorators import with_thought_callback, log_thought
 logger = logging.getLogger(__name__)
 
 @with_thought_callback(category="analysis", node_name="Router")
-def router_preprocess(state: GraphState) -> GraphState:
+def process_router(state: GraphState) -> GraphState:
     logger.info("Router preprocessing and routing...")
 
     new_state = state.copy()
@@ -58,7 +58,7 @@ def router_preprocess(state: GraphState) -> GraphState:
                 content=f"File detected. Routing directly to process_file."
             )
         else:
-            new_state["route_to"] = "llm_router"
+            new_state["route_to"] = "classify_request"
             new_state["metadata"]["file_detected"] = False
             new_state["metadata"]["previous_routing"] = "financial_analysis"
             
@@ -72,7 +72,7 @@ def router_preprocess(state: GraphState) -> GraphState:
     else:
         new_state["extracted_text"] = ""
         new_state["file_data"] = None
-        new_state["route_to"] = "direct_response"        
+        new_state["route_to"] = "handle_chat"        
     
         log_thought(
             session_id=session_id,
@@ -85,7 +85,7 @@ def router_preprocess(state: GraphState) -> GraphState:
     return new_state
 
 @with_thought_callback(category="analysis", node_name="LLM Router")
-def llm_router(state: GraphState) -> GraphState:
+def classify_request(state: GraphState) -> GraphState:
     logger.info("LLM Router: Classifying message content...")
     
     new_state = state.copy()
@@ -144,7 +144,18 @@ def llm_router(state: GraphState) -> GraphState:
         
         new_state["llm_classification"] = response_text
         
-        if "visualization" in response_text:
+        if "document" in response_text:
+            new_state["route_to"] = "document_task"
+            new_state["metadata"]["previous_routing"] = "document_task"
+            
+            log_thought(
+                session_id=session_id,
+                type="thought",
+                category="analysis",
+                node="LLM Router",
+                content=f"LLM classified query as document generation request. Routing to document task workflow."
+            )
+        elif "visualization" in response_text:
             new_state["route_to"] = "visualize_data"
             new_state["metadata"]["previous_routing"] = "visualize_data"
             
@@ -167,20 +178,20 @@ def llm_router(state: GraphState) -> GraphState:
                 content=f"LLM classified query as financial. Routing to financial analysis workflow."
             )
         else:  
-            new_state["route_to"] = "direct_response"
-            new_state["metadata"]["previous_routing"] = "direct_response"
+            new_state["route_to"] = "handle_chat"
+            new_state["metadata"]["previous_routing"] = "handle_chat"
             
             log_thought(
                 session_id=session_id,
                 type="thought",
                 category="analysis",
                 node="LLM Router",
-                content=f"LLM classified query as general conversation. Routing to direct response."
+                content=f"LLM classified query as general conversation. Routing to chat handler."
             )
             
     except Exception as e:
         logger.error(f"Error in LLM classification: {str(e)}")
-        new_state["route_to"] = "direct_response"
+        new_state["route_to"] = "handle_chat"
         new_state["metadata"]["llm_classification_error"] = str(e)
         
         log_thought(
@@ -188,7 +199,7 @@ def llm_router(state: GraphState) -> GraphState:
             type="thought",
             category="error",
             node="LLM Router",
-            content=f"Error during classification. Defaulting to direct response.",
+            content=f"Error during classification. Defaulting to chat handler.",
             technical_details={"error": str(e)}
         )
 

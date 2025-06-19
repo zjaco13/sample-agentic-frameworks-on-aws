@@ -1,7 +1,7 @@
 ## 3P Agentic Frameworks
 
 <p align="center">
-  <img src="assets/3p-agentic-frameworks-new.png" alt="Project banner" width="1000">
+  <img src="docs/agentic-frameworks-aws.png" alt="Project banner" width="1000">
 </p>
 
 [![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)

@@ -1,30 +1,45 @@
-import json
-import os
+from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentProvider
 
 def lambda_handler(event, context):
     domain = event['requestContext']['domainName']
-    region = os.environ.get("AWS_REGION", "us-east-1")
-    model_id = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
-
+    env = event['requestContext'].get('env', 'dev')
+    skill = AgentSkill(
+        id="market-summary",
+        name="Market Summary",
+        description=(
+            "Generates concise, clear summaries of financial markets for a given sector, "
+            "including sentiment analysis and major trends. Useful for portfolio insights and trade decisions."
+        ),
+        tags=["finance", "summary", "sentiment", "market analysis", "aws"],
+        examples=[
+            "Summarize the outlook for the technology sector.",
+            "Give me a bullish or bearish summary for the US stock market in oil and gas industry."
+        ],
+        inputModes=["text"],
+        outputModes=["text"]
+    )
+    agent_card = AgentCard(
+        name="MarketAnalysisAgent",
+        description="Provides market analysis summaries and sentiment insights using Amazon Bedrock foundation models.",
+        url=f"https://{domain}/{env}/message/send",
+        provider=AgentProvider(
+            organization="AWS Sample Agentic Team",
+            url="https://aws.amazon.com/bedrock/"
+        ),
+        version="1.0.0",
+        documentationUrl="https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html",
+        capabilities=AgentCapabilities(
+            streaming=False,
+            pushNotifications=False,
+            stateTransitionHistory=False
+        ),
+        defaultInputModes=["text"],
+        defaultOutputModes=["text"],
+        skills=[skill],
+        supportsAuthenticatedExtendedCard=False,
+    )
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "id": "market-analysis-agent",
-            "name": "MarketAnalysisAgent",
-            "description": "Provides market analysis summaries and sentiment insights via Bedrock.",
-            "protocol": "A2A/1.0",
-            "capabilities": ["MarketSummary"],
-            "endpoints": {
-                "send": f"https://{domain}/dev/tasks/send"
-            },
-            "metadata": {
-                "streaming": True,
-                "modelId": model_id,
-                "region": region,
-                "provider": "Bedrock/Anthropic"
-            }
-        }),
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "body": agent_card.model_dump_json(),
+        "headers": {"Content-Type": "application/json"}
     }

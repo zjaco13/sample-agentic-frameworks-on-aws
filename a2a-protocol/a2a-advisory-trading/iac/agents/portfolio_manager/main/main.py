@@ -1,236 +1,320 @@
 import os
-import re
 import json
-import boto3
-import asyncio
-import io
+import uuid
 import time
+import asyncio
 from datetime import datetime
-from typing import Dict, Any, Optional
-from a2a_core import Task, get_logger
-from a2a_core import discover_agent_cards
-from a2a_core import send_task
+from typing import Dict, Any, Optional, Tuple
+# from strands_tools import http_request
+from strands import Agent as StrandsAgent
+from strands.models import BedrockModel
+from a2a.types import (
+    Task, TaskStatus, TaskState, Message, Role, TextPart, DataPart, Artifact,
+)
+from a2a_core import discover_agent_cards, send_task
 
-logger = get_logger({"agent": "PortfolioManagerAgent"})
+SYSTEM_PROMPT = (
+    "You are a senior portfolio manager. Given a user's request, decompose it into structured subtasks for "
+    "MarketSummary, RiskEvaluation, and ExecuteTrade as appropriate. Use strictly defined JSON formats for each task. "
+    "For any missing symbol or quantity, set as 'TBD'. "
+    "If the user input has the intent of buying/selling/holding shares, the analysisType of the RiskEvaluation should set to 'asset'. "
+)
 
+SKILL_MAP = {
+    "MarketSummary": "market-summary",
+    "RiskEvaluation": "risk-evaluation",
+    "ExecuteTrade": "trade-execution"
+}
+
+
+def build_message_parts(user_input: str, payload: dict) -> list:
+    return [
+        TextPart(kind="text", text=user_input, metadata={}),
+        DataPart(kind="data", data=payload, metadata={}),
+    ]
 
 class PortfolioManagerAgent:
-    def __init__(self, model_id: Optional[str] = None, region: Optional[str] = "us-east-1"):
-        self.model_id = model_id or os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
-        self.region = region or os.environ.get("AWS_REGION", "us-east-1")
-        self.client = boto3.client("bedrock-runtime", region_name=self.region)
+    def __init__(self, model_id: Optional[str] = None, region: Optional[str] = None):
+        model_id = model_id or os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
+        region_name = region or os.getenv("AWS_PRIMARY_REGION", "us-east-1")
+        self.model = BedrockModel(
+            model_id=model_id,
+            streaming=False,
+            region_name=region_name,
+            max_tokens=900
+        )
+        self.strands_agent = StrandsAgent(
+            model=self.model,
+            system_prompt=SYSTEM_PROMPT
+            # tools=[http_request] # tools use in local
+        )
 
-    async def analyze(self, input_data: Dict[str, Any], task_id: str) -> Dict[str, Any]:
+    async def analyze(self, input_data: Dict[str, Any], session_id: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
+        task_id = session_id or str(uuid.uuid4())
         print("Starting portfolio orchestration", {"task_id": task_id})
 
-        try:
-            # Check if this is phase 2 (trade execution)
-            if input_data.get("trade_confirmation_phase"):
-                return await self._execute_trade_phase(input_data, task_id)
+        # === PHASE 2: TRADE EXECUTION ===
+        if input_data.get("trade_confirmation_phase"):
+            return await self._execute_trade_phase(input_data, task_id)
 
-            # Phase 1: Initial Analysis
-            plan = self._decompose_task(input_data)
-            routing_table = await discover_agent_cards()
+        # === PHASE 1: PORTFOLIO ANALYSIS/PLANNING ===
+        user_input = input_data.get("user_input")
+        if not user_input:
+            raise ValueError("Missing user_input for portfolio orchestration")
 
-            print("Capabilities discovered", {"routes": list(routing_table.keys())})
-            metadata = []
-            agent_outputs = {}
+        plan = self._decompose_task(user_input)
 
-            # Check if we need symbol resolution
-            needs_symbol_resolution = False
-            if "RiskEvaluation" in plan:
-                risk_eval = plan["RiskEvaluation"]
-                if (risk_eval.get("analysisType") == "asset" and
-                        (not risk_eval.get("specificAsset") or
-                         risk_eval.get("specificAsset", {}).get("symbol") == "TBD")):
-                    needs_symbol_resolution = True
+        '''
+             For local use only - Uncomment to use 
+             ------------------------------------------------------
+             Using http request tool for extra context 
+             To use: in your prompt, indicate the link
+             _extra_context() would extract link and summarize it.
+        '''
+        # extra_context =  self._extra_context(user_input)
+        # for capability, payload in plan.items():
+        #     if capability != "ExecuteTrade":
+        #         payload["extraContext"] = extra_context
 
-            if "ExecuteTrade" in plan and plan["ExecuteTrade"].get("symbol") == "TBD":
-                needs_symbol_resolution = True
+        routing_table = await discover_agent_cards()
+        metadata = []
+        agent_outputs = {}
 
-            # If symbol resolution needed, process market analysis first
-            if needs_symbol_resolution:
-                market_analysis_task = Task(
-                    id=f"{task_id}-market-analysis",
-                    input={"user_input": input_data.get("user_input", "")},
-                    created_at=datetime.utcnow().isoformat(),
-                    modified_at=datetime.utcnow().isoformat()
+        needs_symbol_resolution = (
+                ("RiskEvaluation" in plan and
+                 plan["RiskEvaluation"].get("analysisType") == "asset" and
+                 (not plan["RiskEvaluation"].get("specificAsset") or
+                  plan["RiskEvaluation"]["specificAsset"].get("symbol") == "TBD"))
+                or
+                ("ExecuteTrade" in plan and plan["ExecuteTrade"].get("symbol") == "TBD")
+        )
+
+        if needs_symbol_resolution:
+            # --- 1. MARKET ANALYSIS TO RESOLVE SYMBOL ---
+            ms_skill = SKILL_MAP["MarketSummary"]
+            ms_agent_url = routing_table.get(ms_skill)
+            if not ms_agent_url:
+                raise ValueError(f"{ms_skill} capability not available for symbol resolution")
+
+            ms_history = [
+                Message(
+                    role=Role.user,
+                    parts=build_message_parts(user_input, plan["MarketSummary"]),
+                    messageId=str(uuid.uuid4()),
+                    kind="message",
+                    contextId=task_id,
+                    taskId=task_id,
                 )
+            ]
+            market_task = Task(
+                id=f"{task_id}-market-analysis",
+                contextId=task_id,
+                status=TaskStatus(state=TaskState.submitted, timestamp=datetime.utcnow().isoformat() + "Z"),
+                history=ms_history,
+                input=plan["MarketSummary"],
+                artifacts=[],
+                metadata={},
+                kind="task"
+            )
+            print("Resolving symbol through market analysis")
+            skill, ms_task = await self._send_to_agent(market_task, ms_skill, ms_agent_url)
 
-                if "MarketSummary" not in routing_table:
-                    raise ValueError("MarketSummary capability not available for symbol resolution")
+            if isinstance(ms_task, Exception) or not hasattr(ms_task, "status") or ms_task.status.state != TaskState.completed:
+                raise Exception(f"MarketSummary failed: {ms_task}")
 
-                print("Resolving symbol through market analysis")
-                market_analysis_result = await self._send_to_agent(
-                    market_analysis_task,
-                    "MarketSummary",
-                    routing_table["MarketSummary"]
-                )
-
-                if isinstance(market_analysis_result[1], Exception):
-                    raise market_analysis_result[1]
-
-                # Store market analysis result
-                agent_outputs["MarketSummary"] = {
-                    "status": "completed",
-                    "response": market_analysis_result[1].output
-                }
-                metadata.append("✅ MarketSummary completed")
-
-                # Extract symbol from market analysis
-                symbol = await self._extract_symbol_from_analysis(
-                    input_data.get("user_input", ""),
-                    market_analysis_result[1].output
-                )
-
-                # Update RiskEvaluation if present
-                if "RiskEvaluation" in plan:
-                    if plan["RiskEvaluation"].get("analysisType") == "asset":
-                        if "specificAsset" not in plan["RiskEvaluation"]:
-                            plan["RiskEvaluation"]["specificAsset"] = {}
-                        plan["RiskEvaluation"]["specificAsset"]["symbol"] = symbol
-                        risk_task = Task(
-                            id=f"{task_id}-risk-evaluation",
-                            input=plan["RiskEvaluation"],
-                            created_at=datetime.utcnow().isoformat(),
-                            modified_at=datetime.utcnow().isoformat()
-                        )
-
-                        if "RiskEvaluation" not in routing_table:
-                            agent_outputs["RiskEvaluation"] = {
-                                "status": "skipped",
-                                "reason": "No agent found for RiskEvaluation"
-                            }
-                            metadata.append("⚠️ RiskEvaluation skipped — no agent found")
-                        else:
-                            risk_result = await self._send_to_agent(
-                                risk_task,
-                                "RiskEvaluation",
-                                routing_table["RiskEvaluation"]
-                            )
-
-                            if isinstance(risk_result[1], Task) and risk_result[1].status == "completed":
-                                agent_outputs["RiskEvaluation"] = {
-                                    "status": "completed",
-                                    "response": risk_result[1].output
-                                }
-                                metadata.append("✅ RiskEvaluation completed")
-                            else:
-                                agent_outputs["RiskEvaluation"] = {
-                                    "status": "failed",
-                                    "error": str(risk_result[1])
-                                }
-                                metadata.append(f"❌ RiskEvaluation failed: {risk_result[1]}")
-
-                # Update ExecuteTrade if present
-                if "ExecuteTrade" in plan:
-                    plan["ExecuteTrade"]["symbol"] = symbol
-
-            else:
-                # Process all non-trade tasks asynchronously if no symbol resolution needed
-                tasks = []
-                for capability, payload in plan.items():
-                    if capability == "ExecuteTrade":  # Skip trade execution in phase 1
-                        continue
-
-                    if capability not in routing_table:
-                        agent_outputs[capability] = {
-                            "status": "skipped",
-                            "reason": f"No agent found for capability {capability}"
-                        }
-                        metadata.append(f"⚠️ {capability} skipped — no agent found")
-                        continue
-
-                    subtask = Task(
-                        id=f"{task_id}-{capability.lower()}",
-                        input=payload,
-                        created_at=datetime.utcnow().isoformat(),
-                        modified_at=datetime.utcnow().isoformat()
-                    )
-
-                    endpoint = routing_table[capability]
-                    print("Dispatching async task", {"capability": capability, "to": endpoint})
-                    tasks.append(self._send_to_agent(subtask, capability, endpoint))
-
-                results = await asyncio.gather(*tasks)
-
-                for capability, result in results:
-                    if isinstance(result, Task) and result.status == "completed":
-                        agent_outputs[capability] = {
-                            "status": "completed",
-                            "response": result.output
-                        }
-                        metadata.append(f"✅ {capability} completed")
-                    else:
-                        agent_outputs[capability] = {
-                            "status": "failed",
-                            "error": str(result)
-                        }
-                        metadata.append(f"❌ {capability} failed: {result}")
-
-            # If trade execution is in the plan, return with pending status
-            if "ExecuteTrade" in plan:
-                return {
-                    "status": "pending",
-                    "analysis_results": agent_outputs,
-                    "trade_details": plan["ExecuteTrade"],
-                    "session_id": task_id,
-                    "summary": " | ".join(metadata),
-                    "delegated_tasks": [task for task in plan.keys() if task != "ExecuteTrade"]
-                }
-
-            duration = time.time() - start_time
-            print("Portfolio analysis complete", {"duration_sec": duration})
-
-            return {
+            agent_outputs["MarketSummary"] = {
                 "status": "completed",
-                "summary": " | ".join(metadata),
-                "delegated_tasks": list(plan.keys()),
-                "agent_outputs": agent_outputs
+                "response": getattr(ms_task, "output", None) or getattr(ms_task, "artifacts", [])
             }
+            metadata.append("✅ MarketSummary completed")
 
-        except Exception as e:
-            logger.error("PortfolioManager failed", {"error": str(e)})
+            symbol = await self._extract_symbol_from_analysis(user_input, getattr(ms_task, "output", None))
+
+            if "RiskEvaluation" in plan and plan["RiskEvaluation"].get("analysisType") == "asset":
+                if "specificAsset" not in plan["RiskEvaluation"]:
+                    plan["RiskEvaluation"]["specificAsset"] = {}
+                plan["RiskEvaluation"]["specificAsset"]["symbol"] = symbol
+
+                ra_skill = SKILL_MAP["RiskEvaluation"]
+                ra_agent_url = routing_table.get(ra_skill)
+                ra_history = [
+                    Message(
+                        role=Role.user,
+                        parts=build_message_parts(user_input, plan["RiskEvaluation"]),
+                        messageId=str(uuid.uuid4()),
+                        kind="message",
+                        contextId=task_id,
+                        taskId=task_id,
+                    )
+                ]
+                risk_task = Task(
+                    id=f"{task_id}-risk-evaluation",
+                    contextId=task_id,
+                    status=TaskStatus(state=TaskState.submitted, timestamp=datetime.utcnow().isoformat() + "Z"),
+                    history=ra_history,
+                    input=plan["RiskEvaluation"],
+                    artifacts=[],
+                    metadata={},
+                    kind="task"
+                )
+
+                if not ra_agent_url:
+                    agent_outputs["RiskEvaluation"] = {
+                        "status": "skipped",
+                        "reason": "No agent found for RiskEvaluation"
+                    }
+                    metadata.append("⚠️ RiskEvaluation skipped — no agent found")
+                else:
+                    _, ra_task = await self._send_to_agent(risk_task, ra_skill, ra_agent_url)
+                    if isinstance(ra_task, Task) and ra_task.status.state == TaskState.completed:
+                        agent_outputs["RiskEvaluation"] = {
+                            "status": "completed",
+                            "response": getattr(ra_task, "output", None) or getattr(ra_task, "artifacts", [])
+                        }
+                        metadata.append("✅ RiskEvaluation completed")
+                    else:
+                        agent_outputs["RiskEvaluation"] = {
+                            "status": "failed",
+                            "error": str(ra_task)
+                        }
+                        metadata.append(f"❌ RiskEvaluation failed: {ra_task}")
+
+            if "ExecuteTrade" in plan:
+                plan["ExecuteTrade"]["symbol"] = symbol
+
+        else:
+            # --- 2. ASYNC EXECUTION FOR MARKET & RISK ---
+            tasks = []
+            for capability, payload in plan.items():
+                if capability == "ExecuteTrade":
+                    continue
+                skill = SKILL_MAP.get(capability)
+                print("Skill needs: ", skill)
+                agent_url = routing_table.get(skill)
+                print("Agent url is: ", agent_url)
+                if not agent_url:
+                    agent_outputs[capability] = {
+                        "status": "skipped",
+                        "reason": f"No agent found for capability {capability}"
+                    }
+                    metadata.append(f"⚠️ {capability} skipped — no agent found")
+                    continue
+
+                subtask_history = [
+                    Message(
+                        role=Role.user,
+                        parts=build_message_parts(user_input, payload),
+                        messageId=str(uuid.uuid4()),
+                        kind="message",
+                        contextId=task_id,
+                        taskId=task_id,
+                    )
+                ]
+                subtask = Task(
+                    id=f"{task_id}-{capability.lower()}",
+                    contextId=task_id,
+                    status=TaskStatus(state=TaskState.submitted, timestamp=datetime.utcnow().isoformat() + "Z"),
+                    history=subtask_history,
+                    input=payload,
+                    artifacts=[],
+                    metadata={},
+                    kind="task"
+                )
+                print("Dispatching async task", {"capability": capability, "to": agent_url})
+                tasks.append(self._send_to_agent(subtask, skill, agent_url))
+            results = await asyncio.gather(*tasks)
+            for (capability, result) in results:
+                if isinstance(result, Task) and result.status.state == TaskState.completed:
+                    agent_outputs[capability] = {
+                        "status": "completed",
+                        "response": getattr(result, "output", None) or getattr(result, "artifacts", [])
+                    }
+                    metadata.append(f"✅ {capability} completed")
+                else:
+                    agent_outputs[capability] = {
+                        "status": "failed",
+                        "error": str(result)
+                    }
+                    metadata.append(f"❌ {capability} failed: {result}")
+
+        # --- PHASE 1 END: IF TRADE NEEDED, PAUSE FOR USER CONFIRMATION ---
+        if "ExecuteTrade" in plan:
             return {
-                "status": "failed",
-                "summary": "Internal failure. Could not process portfolio request.",
-                "error": str(e),
-                "agent_outputs": {}
+                "status": "pending",
+                "analysis_results": agent_outputs,
+                "trade_details": plan["ExecuteTrade"],
+                "session_id": task_id,
+                "summary": " | ".join(metadata),
+                "delegated_tasks": [k for k in plan.keys() if k != "ExecuteTrade"]
             }
 
-    async def _send_to_agent(self, task: Task, capability: str, endpoint: str):
+        duration = time.time() - start_time
+        print("Portfolio analysis complete", {"duration_sec": duration})
+        return {
+            "status": "completed",
+            "summary": " | ".join(metadata),
+            "delegated_tasks": list(plan.keys()),
+            "agent_outputs": agent_outputs,
+            "iso_time": datetime.utcnow().isoformat()
+        }
+
+    async def _send_to_agent(self, task: Task, skill: str, endpoint: str) -> Tuple[str, Task]:
         try:
-            response_task = await send_task(task, endpoint)
-            return (capability, response_task)
+            response_task = await send_task(task, endpoint, skill)
+            return skill, response_task
         except Exception as e:
-            logger.error("Subtask failed", {"capability": capability, "error": str(e)})
-            return (capability, e)
+            return skill, e
 
     async def _execute_trade_phase(self, input_data: Dict[str, Any], task_id: str) -> Dict[str, Any]:
         try:
             trade_details = input_data.get("trade_details")
+            user_input = input_data.get("user_input")
             if not trade_details:
                 raise ValueError("Missing trade details for execution phase")
-
             routing_table = await discover_agent_cards()
-            if "ExecuteTrade" not in routing_table:
+            skill = SKILL_MAP["ExecuteTrade"]
+            agent_url = routing_table.get(skill)
+            if not agent_url:
                 raise ValueError("ExecuteTrade capability not available")
-
+            te_history = [
+                Message(
+                    role=Role.user,
+                    parts=build_message_parts(user_input, trade_details),
+                    messageId=str(uuid.uuid4()),
+                    kind="message",
+                    contextId=task_id,
+                    taskId=task_id,
+                )
+            ]
             trade_task = Task(
                 id=f"{task_id}-executetrade",
-                input=trade_details,
-                created_at=datetime.utcnow().isoformat(),
-                modified_at=datetime.utcnow().isoformat()
+                contextId=task_id,
+                status=TaskStatus(state=TaskState.submitted, timestamp=datetime.utcnow().isoformat() + "Z"),
+                history=te_history,
+                artifacts=[],
+                metadata={},
+                kind="task"
             )
 
-            trade_result = await self._send_to_agent(
-                trade_task,
-                "ExecuteTrade",
-                routing_table["ExecuteTrade"]
-            )
+            print("***Trade task:", trade_task)
 
-            if isinstance(trade_result[1], Task) and trade_result[1].status == "completed":
+            _, te_task = await self._send_to_agent(trade_task, skill, agent_url)
+
+            if isinstance(te_task, Task) and te_task.status.state == TaskState.completed:
+                response_text = None
+                if te_task.status and te_task.status.message and te_task.status.message.parts:
+                    for part in te_task.status.message.parts:
+                        if getattr(part, 'root', None) and getattr(part.root, 'kind', None) == 'text':
+                            response_text = getattr(part.root, 'text', None)
+                            break
+                trade_info = None
+                if response_text:
+                    try:
+                        trade_info = json.loads(response_text)
+                    except Exception:
+                        trade_info = response_text
+
                 return {
                     "status": "completed",
                     "summary": "✅ Trade execution completed",
@@ -238,25 +322,26 @@ class PortfolioManagerAgent:
                     "agent_outputs": {
                         "ExecuteTrade": {
                             "status": "completed",
-                            "response": trade_result[1].output
+                            "response": trade_info
                         }
-                    }
+                    },
+                    "iso_time": datetime.utcnow().isoformat()
                 }
             else:
                 return {
                     "status": "failed",
-                    "summary": f"❌ Trade execution failed: {trade_result[1]}",
+                    "summary": f"❌ Trade execution failed: {te_task}",
                     "delegated_tasks": ["ExecuteTrade"],
                     "agent_outputs": {
                         "ExecuteTrade": {
                             "status": "failed",
-                            "error": str(trade_result[1])
+                            "error": str(te_task)
                         }
-                    }
+                    },
+                    "iso_time": datetime.utcnow().isoformat()
                 }
-
         except Exception as e:
-            logger.error("Trade execution failed", {"error": str(e)})
+            print("Trade execution failed", {"error": str(e)})
             return {
                 "status": "failed",
                 "summary": f"Trade execution failed: {str(e)}",
@@ -264,7 +349,31 @@ class PortfolioManagerAgent:
                 "agent_outputs": {}
             }
 
-    async def _extract_symbol_from_analysis(self, user_input: str, market_analysis_output: Dict[str, Any]) -> str:
+    def _decompose_task(self, user_input: str) -> Dict[str, Any]:
+        prompt = (
+            "Based on the user's message, return appropriate task input "
+            "for the following capabilities (if applicable):\n\n"
+            "- MarketSummary → { sector, focus, riskFactors }\n"
+            "- RiskEvaluation → { sector, analysisType, timeHorizon, capitalExposure, "
+            "specificAsset: { symbol, quantity, action } }\n"
+            "- ExecuteTrade → { action, symbol, quantity }\n\n"
+            "Respond ONLY with a JSON payload like:\n"
+            "{\n"
+            "  \"MarketSummary\": {\"sector\": \"EV\", ...},\n"
+            "  \"RiskEvaluation\": { \"sector\": \"technology\", \"analysisType\": \"sector\", ... },\n"
+            "  \"ExecuteTrade\": { ... }\n"
+            "}\n\n"
+            f"User input:\n\"{user_input}\""
+            "\nDo not need to give any extra information about the output, only gives the JSON payload as required."
+        )
+        result = str(self.strands_agent(prompt))
+        try:
+            parsed = json.loads(result)
+            return parsed
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Bad JSON from Claude: {str(e)}")
+
+    async def _extract_symbol_from_analysis(self, user_input: str, market_analysis_output: Any) -> str:
         prompt = (
             "Based on the market analysis response and original user request, identify the specific stock symbol "
             "that should be used for risk assessment and trading. Return ONLY the stock symbol without any additional "
@@ -273,102 +382,27 @@ class PortfolioManagerAgent:
             f"Market analysis response: {json.dumps(market_analysis_output, indent=2)}\n\n"
             "Respond with the stock symbol only."
         )
+        symbol = str(self.strands_agent(prompt)).strip().upper()
+        return symbol
 
-        print("Sending prompt to Bedrock for symbol analysis")
-        try:
-            output = self._invoke_claude(prompt)
-
-            # Clean the output and extract symbol
-            symbol = output.strip().upper()
-
-            # Basic validation for stock symbol format
-            if not re.match(r'^[A-Z]{1,5}$', symbol):
-                print(f"Warning: Unexpected symbol format received: {symbol}")
-                # Try to extract symbol if there's additional text
-                match = re.search(r'[A-Z]{1,5}', symbol)
-                if match:
-                    symbol = match.group()
-                else:
-                    raise ValueError(f"Could not extract valid symbol from: {symbol}")
-
-            print(f"Extracted symbol: {symbol}")
-            return symbol
-
-        except Exception as e:
-            logger.error("Symbol extraction failed", {"error": str(e), "output": output if 'output' in locals() else None})
-            raise ValueError(f"Failed to extract symbol: {str(e)}")
-
-    def _decompose_task(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        user_input = input_data.get("user_input", "").strip()
-        if not user_input:
-            raise ValueError("Missing user_input in input_data")
-
+    async def _extra_context(self, link_input: list) -> Dict[str, float]:
+        """
+            Note: The effectiveness of the tool depends on
+            (1) user input clarity and correctness of link - link should be properly formatted
+            (2) accessibility to the provided link - users need to make sure authentication is in place (if any)
+        """
         prompt = (
-            "You are a financial assistant. Based on the user's message, return appropriate task input "
-            "for the following capabilities (if applicable):\n\n"
-            "- MarketSummary → { sector, focus, riskFactors }\n"
-            "- RiskEvaluation → { sector, analysisType, timeHorizon, capitalExposure, "
-            "specificAsset: { symbol, quantity, action } }\n"
-            "- ExecuteTrade → { action, symbol, quantity }\n\n"
-            "For RiskEvaluation, analysisType can be one of the following:\n"
-            "- 'sector': Analysis of an entire industry sector's risks (e.g., technology, healthcare). "
-            "Do not include specificAsset for sector analysis.\n"
-            "- 'asset': Analysis of a specific stock or security. Must include specificAsset with "
-            "symbol, quantity, and action details. If either quantity or symbol is missing, assign the value of TBD for the field. \n"
-            "- 'general': Overall market or portfolio risk assessment without focus on specific "
-            "sectors or assets. Do not include specificAsset for general analysis.\n\n"
-            "Respond ONLY with a JSON payload like:\n"
+            f"Using http request tool. "
+            f"Return the 100 words summary of information for the link provided in {link_input}.\n"
+            "Format required:\n"
             "{\n"
-            "  \"MarketSummary\": {\"sector\": \"EV\", ...},\n"
-            "  \"RiskEvaluation\": { \"sector\": \"technology\", \"analysisType\": \"sector\", ... },\n"
-            "  \"ExecuteTrade\": { ... }\n"
-            "}\n\n"
-            f"User input:\n\"{user_input}\""
+            '  "summary": <summary data>\n'
+            "}\n"
         )
-
-        print("Sending prompt to Bedrock", {"prompt_preview": prompt[:300]})
-        output = self._invoke_claude(prompt)
-
-        match = re.search(r"\{[\s\S]*\}", output)
-        if not match:
-            raise ValueError("Claude output missing JSON")
-
         try:
-            return json.loads(match.group())
+            result = str(self.strands_agent(prompt))
+            parsed = json.loads(result)
+            return parsed
         except json.JSONDecodeError as e:
-            raise ValueError(f"Bad JSON from Claude: {str(e)}")
-
-    def _invoke_claude(self, prompt: str) -> str:
-        try:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}]
-                }
-            ]
-
-            print("Calling Claude via streaming...", {"prompt_preview": prompt[:200]})
-
-            response_stream = self.client.converse_stream(
-                modelId=self.model_id,
-                messages=messages,
-                inferenceConfig={
-                    "maxTokens": 500,
-                    "temperature": 0.5,
-                    "topP": 0.9
-                }
-            )
-
-            output = io.StringIO()
-            for event in response_stream["stream"]:
-                if "contentBlockDelta" in event:
-                    chunk = event["contentBlockDelta"]["delta"].get("text", "")
-                    output.write(chunk)
-
-            full_text = output.getvalue().strip()
-            print("Streaming complete", {"length": len(full_text)})
-            return full_text
-
-        except Exception as e:
-            logger.error("Claude streaming failed", {"error": str(e)})
-            raise e
+            print(f"Error getting summary", {"error": str(e)})
+            raise ValueError(f"Failed to summarize data {str(e)}")

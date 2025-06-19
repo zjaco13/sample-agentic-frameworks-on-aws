@@ -1,163 +1,207 @@
-import boto3
-import json
 import os
 import re
-import io
-import time
-from typing import Dict, Any, Optional
-from a2a_core import get_logger
+import json
+import uuid
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+from strands import Agent as StrandsAgent
+from strands.models import BedrockModel
+from a2a.types import Task, TaskStatus, TaskState, Message, Artifact, Role, TextPart, DataPart
 
-logger = get_logger({"agent": "MarketAnalysisAgent"})
+SYSTEM_PROMPT = (
+    "You are a financial analyst. Provide clear, insightful market summaries. "
+    "Answer the questions to the best of your model training data."
+)
 
+def extract_user_input_from_task(task: Task) -> Dict[str, Any]:
+    _input_data = {}
 
-def build_prompt(input_data: Dict[str, Any]) -> str:
-    sector = input_data.get("sector", "technology sector")
-    focus = input_data.get("focus", "overall outlook")
-    risk_factors = input_data.get("riskFactors", [])
-    summary_length = input_data.get("summaryLength", 150)
+    print(f"DEBUG: Received task: {task}")
 
-    risks = ", ".join(risk_factors) if risk_factors else "market uncertainty"
+    if not task or not task.history:
+        print("DEBUG: No task or history found")
+        return {"error": "No task or history found"}
 
-    prompt = (
-        f"You are a financial analyst. Provide a market summary for the {sector}. "
-        f"Focus on: {focus}. Discuss key trends, opportunities, and threats. "
-        f"Consider risk factors such as: {risks}. Limit your response to approximately {summary_length} words."
-    )
+    # Find the most recent user message
+    user_messages = [msg for msg in task.history if msg.role.value == "user"]
+    if not user_messages:
+        print("DEBUG: No user messages found")
+        return {"error": "No user messages found"}
 
-    print("Prompt built", {"sector": sector, "focus": focus, "risks": risks})
-    return prompt
+    latest_user_message = user_messages[-1]
+    print(f"DEBUG: Latest user message: {latest_user_message}")
+
+    # Process message parts
+    for part in latest_user_message.parts:
+        print(f"DEBUG: Processing part: {part}")
+        if part.root.kind == "text":
+            _input_data["userContext"] = part.root.text
+        if part.root.kind == "data" and part.root.data:
+            # Extract main data fields
+            data = part.root.data
+            _input_data["sector"] = data.get("sector", "UNKNOWN_SECTOR")
+            _input_data["focus"] = data.get("focus", "UNKNOWN_FOCUS")
+            _input_data["riskFactors"] = data.get("riskFactors", [])
+            _input_data["summaryLength"] = data.get("summaryLength", 200)
+            # Extract extra context if present
+            if "extraContext" in data:
+                _input_data["extraContext"] = data["extraContext"]
+
+    print(f"DEBUG: Extracted data: {_input_data}")
+    return _input_data
 
 
 class MarketAnalysisAgent:
-    def __init__(self, model_id: Optional[str] = None, region: Optional[str] = "us-east-1"):
-        self.model_id = model_id or os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
-        self.region = region or os.environ.get("AWS_REGION", "us-east-1")
-        self.client = boto3.client(service_name="bedrock-runtime", region_name=self.region)
+    def __init__(self, model_id: Optional[str] = None, region: Optional[str] = None):
+        model_id = model_id or os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
+        region_name = region or os.environ.get("AWS_PRIMARY_REGION", "us-east-1")
+        self.model = BedrockModel(
+            model_id=model_id,
+            streaming=True,
+            region_name=region_name,
+            max_tokens=600
+        )
+        self.strands_agent = StrandsAgent(
+            model=self.model,
+            system_prompt=SYSTEM_PROMPT
+        )
 
-    def _invoke_claude_stream(self, prompt: str) -> str:
+    def build_prompt(self, input_: Dict[str, Any]) -> str:
+        extra_context = input_.get("extraContext", None)
+        user_context = input_.get("userContext", None)
+        sector = input_.get("sector", "technology sector")
+        focus = input_.get("focus", "overall outlook")
+        risk_factors = input_.get("riskFactors", [])
+        summary_length = input_.get("summaryLength", 150)
+        risks = ", ".join(risk_factors) if risk_factors else "market uncertainty"
+        prompt = (
+            f"Knowing the user request: {user_context}. "
+            f"Write a concise, coherent, and natural-sounding market summary (about {summary_length} words) for the {sector} sector. "
+            f"Focus on {focus}. Discuss key trends, opportunities, and threats in a single paragraph. "
+            f"If the user request has the intention of making a trade but did not specify which stock or company, "
+            f"then the summary should name out what is the company that matches user description for investment. "
+            f"Do NOT include a title, bullet points, or any formatting—write in natural English prose only. "
+            f"Consider risk factors such as: {risks}."
+        )
+
+        '''
+        For local use only
+        '''
+        if extra_context:
+            prompt += f" Here is more context: {extra_context}."
+        return prompt
+
+    def analyze(self, task: Task) -> Task:
+        prompt_input = extract_user_input_from_task(task)
+
+        prompt = self.build_prompt(prompt_input)
+
         try:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}]
-                }
-            ]
-
-            print("Calling Claude via streaming...", {"prompt_preview": prompt[:200]})
-
-            response_stream = self.client.converse_stream(
-                modelId=self.model_id,
-                messages=messages,
-                inferenceConfig={
-                    "maxTokens": 500,
-                    "temperature": 0.5,
-                    "topP": 0.9
-                }
-            )
-
-            output = io.StringIO()
-            for event in response_stream["stream"]:
-                if "contentBlockDelta" in event:
-                    chunk = event["contentBlockDelta"]["delta"].get("text", "")
-                    output.write(chunk)
-
-            full_text = output.getvalue().strip()
-            print("Streaming complete", {"length": len(full_text)})
-            return full_text
-
-        except Exception as e:
-            logger.error("Streaming failed", {"error": str(e)})
-            raise e
-
-    def extract_tags(self, summary: str) -> Dict[str, Any]:
-        try:
-            prompt = (
-                f"Analyze the following market summary and return 3–5 key themes as a list of 'tags', and "
-                f"the overall sentiment (positive, neutral, or negative). "
-                f"Respond with JSON ONLY in the format:\n"
-                f"{{\"tags\": [\"tag1\", \"tag2\"], \"sentiment\": \"positive\"}}\n\n"
-                f"Summary:\n\"{summary}\""
-            )
-
-            messages = [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}]
-                }
-            ]
-
-            response_stream = self.client.converse_stream(
-                modelId=self.model_id,
-                messages=messages,
-                inferenceConfig={
-                    "maxTokens": 200,
-                    "temperature": 0.3,
-                    "topP": 0.9
-                }
-            )
-
-            output = io.StringIO()
-            for event in response_stream["stream"]:
-                if "contentBlockDelta" in event:
-                    output.write(event["contentBlockDelta"]["delta"].get("text", ""))
-
-            response_text = output.getvalue().strip()
-            print("Tag extraction response received", {"raw": response_text})
-
-            match = re.search(r'\{[\s\S]*?\}', response_text)
-            if not match:
-                return {"tags": [], "sentiment": "unknown"}
-
-            parsed = json.loads(match.group())
-            if isinstance(parsed, str):
-                parsed = json.loads(parsed)
-
-            return {
-                "tags": parsed.get("tags", []),
-                "sentiment": parsed.get("sentiment", "unknown")
-            }
-
-        except Exception as e:
-            logger.error("Tag extraction failed", {"error": str(e)})
-            return {"tags": [], "sentiment": "unknown"}
-
-    def analyze(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            prompt = build_prompt(input_data)
-            start = time.time()
-
-            summary = self._invoke_claude_stream(prompt)
-
-            if not summary:
-                logger.warning("No summary returned")
-                return {
-                    "summary": "",
-                    "tags": [],
-                    "sentiment": "unknown"
-                }
-
+            response = self.strands_agent(prompt)
+            summary = str(response)
             tag_data = self.extract_tags(summary)
 
-            duration = time.time() - start
-            print("Market analysis complete", {
-                "duration_sec": duration,
-                "tags": tag_data.get("tags"),
-                "sentiment": tag_data.get("sentiment")
-            })
-
-            return {
-                "summary": summary,
-                "tags": tag_data.get("tags", []),
-                "sentiment": tag_data.get("sentiment", "unknown")
-            }
-
+            parts = [
+                {
+                    "kind": "text",
+                    "text": summary,
+                    "metadata": {}
+                },
+                {
+                    "kind": "data",
+                    "data": tag_data,
+                    "metadata": {}
+                }
+            ]
+            artifact = Artifact(
+                artifactId=str(uuid.uuid4()),
+                parts=parts,
+                name="Market Summary",
+                description="Summary and tags generated by LLM"
+            )
+            msg = Message(
+                role="agent",
+                parts=[TextPart(kind="text", text="Market summary successfully generated.", metadata={})],
+                messageId=str(uuid.uuid4()),
+                kind="message",
+                taskId=task.id,
+                contextId=getattr(task, "contextId", None)
+            )
+            status = TaskStatus(
+                state=TaskState.completed,
+                message=msg,
+                timestamp=datetime.utcnow().isoformat() + "Z"
+            )
+            task.status = status
+            task.artifacts = task.artifacts or []
+            task.artifacts.append(artifact)
+            if hasattr(task, "kind"):
+                task.kind = "task"
+            else:
+                setattr(task, "kind", "task")
         except Exception as e:
-            logger.error("Analysis failed", {
-                "error": str(e),
-                "error_type": type(e).__name__
-            })
-            return {
-                "summary": "",
-                "tags": [],
-                "sentiment": "unknown"
-            }
+            error_parts = [
+                {
+                    "kind": "text",
+                    "text": str(e),
+                    "metadata": {}
+                }
+            ]
+
+            artifact = Artifact(
+                artifactId=str(uuid.uuid4()),
+                parts=error_parts,
+                name="Error",
+                description="Error encountered during market analysis"
+            )
+
+            error_msg = Message(
+                role="agent",
+                parts=error_parts,
+                messageId=str(uuid.uuid4()),
+                kind="message",
+                taskId=task.id,
+                contextId=getattr(task, "contextId", None)
+            )
+
+            status = TaskStatus(
+                state=TaskState.failed,
+                message=error_msg,
+                timestamp=datetime.utcnow().isoformat() + "Z"
+            )
+
+            task.status = status
+            task.artifacts = task.artifacts or []
+            task.artifacts.append(artifact)
+            if hasattr(task, "kind"):
+                task.kind = "task"
+            else:
+                setattr(task, "kind", "task")
+        return task
+
+
+    def extract_tags(self, summary: str) -> Dict[str, Any]:
+        prompt = (
+            "Analyze the following market summary and return exactly 4-7 key themes as a list of 'tags', "
+            "and the overall sentiment (positive, neutral, or negative) for investors. "
+            "Respond with nothing except a single JSON object with this format:\n"
+            '{"tags": ["tag1", "tag2", "tag3"], "sentiment": "positive"}\n'
+            "No title. No explanation. No extra text.\n\n"
+            f"Summary:\n\"{summary}\""
+        )
+        try:
+            result = str(self.strands_agent(prompt))
+            try:
+                parsed = json.loads(result)
+            except Exception:
+                match = re.search(r'\{[\s\S]*?}', result)
+                parsed = json.loads(match.group()) if match else {}
+            tags = parsed.get("tags", [])
+            sentiment = parsed.get("sentiment", "unknown")
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+            if not isinstance(sentiment, str):
+                sentiment = str(sentiment)
+            return {"tags": tags, "sentiment": sentiment}
+        except Exception as e:
+            return {"tags": [], "sentiment": "unknown"}

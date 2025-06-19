@@ -45,18 +45,22 @@ async def route_request(request: Request, background_tasks: BackgroundTasks):
         bedrock_agent_client = clients["bedrock_agent_client"]
         
         if client_session_id:
-            if client_session_id in thought_handler.thought_store.queues:
+            if client_session_id in conversation_memory.conversations:
                 session_id = client_session_id
-                logger.info(f"Reusing client-provided session ID: {session_id} (found in thought store)")
+                logger.info(f"Reusing session: {session_id}")
+                
+                # Ensure thought handler also has this session registered
+                if client_session_id not in thought_handler.thought_store.queues:
+                    thought_handler.register_session(session_id)
             else:
-                logger.warning(f"Client session ID {client_session_id} not found in thought store, creating new session")
+                logger.warning(f"Session {client_session_id} not found, creating new session")
                 random_suffix = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
                 session_id = f"session-{int(time.time())}-{random_suffix}"
-                logger.info(f"Created new session ID: {session_id}")
+                logger.info(f"Created new session: {session_id}")
         else:
             random_suffix = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
             session_id = f"session-{int(time.time())}-{random_suffix}"
-            logger.info(f"Created new session ID: {session_id}")
+            logger.info(f"Created new session: {session_id}")
         
         thought_handler.register_session(session_id)
         
@@ -184,6 +188,9 @@ async def process_messages_background(state, model, region, session_id, config):
             thought_handler.thought_store.add_thought(session_id, error_thought)
         
         logger.info(f"Background processing completed for session {session_id}")
+        
+        # DON'T mark session complete - let SSE stream stay alive for continuous use
+        # This preserves the original behavior where sessions stayed active
     except Exception as e:
         logger.error(f"Error in background processing for {session_id}: {str(e)}", exc_info=True)
         error_thought = {
