@@ -10,13 +10,13 @@ Memory is crucial for creating intelligent customer support systems. This projec
 2. **Long-Term Memory**: Persistent Knowledge
     - **Semantic Memory** - Stores general knowledge and concepts
     - **Episodic Memory** - Remembers specific customer events
-    - **Procedural Memory** - Knows how to execute processes optimally
+    - **Factual Memory** - Retains user preferences and persistent attributes
 
-| Memory Type    | Purpose                                           | Use Cases                                         | Benefits                                              |
-| -------------- | ------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
-| **Semantic**   | Facts, knowledge relationships & domain expertise | Insurance policy understanding, coverage patterns | Accumulated domain knowledge, cross-customer insights |
-| **Episodic**   | Specific interaction history                      | Case continuity, pattern recognition              | Seamless follow-ups, learning from history            |
-| **Procedural** | Step-by-step resolution processes                 | Troubleshooting, technical support                | Consistent quality, systematic resolution             |
+| Memory Type  | Purpose                                           | Use Cases                                          | Benefits                                              |
+| ------------ | ------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------- |
+| **Semantic** | Facts, knowledge relationships & domain expertise | Insurance policy understanding, coverage patterns  | Accumulated domain knowledge, cross-customer insights |
+| **Episodic** | Specific interaction history                      | Case continuity, pattern recognition               | Seamless follow-ups, learning from history            |
+| **Factual**  | User preferences & persistent attributes          | Communication style, technical level, risk profile | Personalized interactions, tailored responses         |
 
 Each memory type serves a unique purpose and, when combined, creates a support experience that feels natural, knowledgeable, and personalized.
 
@@ -324,11 +324,11 @@ if customer_context.get('tenure_years', 0) > 10:
 
 ---
 
-## Procedural Memory in Customer Support
+## Factual Memory in Customer Support
 
-### Core Philosophy: Optimal Execution Saves Time and Money
+### Core Philosophy: Know Your Customer's Persistent Preferences
 
-Procedural memory ensures that **complex multi-step processes are executed in the optimal sequence**, maximizing discounts, avoiding errors, and delivering the best possible outcome for customers.
+Factual memory stores persistent facts about customers that shape how we communicate with them - their preferences, style, technical level, and personal context. This ensures every interaction is tailored to who they are.
 
 ### Real-World Insurance Examples
 
@@ -337,78 +337,63 @@ Procedural memory ensures that **complex multi-step processes are executed in th
 "conversation": [
     {
         "role": "customer",
-        "content": "My son just turned 16 and got his license. I'm dreading this - I heard adding a teen can double our premium. He's a good kid, 3.8 GPA, finished driver's ed last month."
+        "content": "Hi, I need to review my policies. I'm not very tech-savvy, so please keep explanations simple. Also, I prefer phone calls over emails - I can never find emails in my inbox!"
     },
     {
         "role": "agent",
-        "content": "Perfect thinking! Here's what I'll do in sequence - the order matters for pricing: First, I'll add him with the good student discount, then apply driver's ed, then assign the Civic. Finally, I'll enroll him in TeenSafe monitoring. The total increase with your son will be about $180/month instead of the $400+ you were fearing."
+        "content": "Absolutely! I'll keep everything straightforward and avoid technical jargon. I've noted that you prefer phone communication. Would you like me to call you to discuss your policy review?"
+    },
+    {
+        "role": "customer",
+        "content": "Yes, please. I'm usually available mornings before 11 AM. I'm retired so I have time to talk through things properly."
+    },
+    {
+        "role": "agent",
+        "content": "Perfect! I've noted that morning calls work best for you. Since you have time for detailed discussions, I'll make sure we cover everything thoroughly but in simple terms."
+    },
+    {
+        "role": "customer",
+        "content": "I'm very safety-conscious, prefer comprehensive coverage even if it costs more. Peace of mind is worth it at my age."
     }
 ]
 ```
 
-**Optimal Procedure Stored:**
-1. Apply good student discount first (15% for 3.0+ GPA)
-2. Then driver's education discount (10%)
-3. Assign to oldest/safest vehicle
-4. Finally enroll in monitoring program (20%)
-5. Order matters - maximizes discount compounding
+**Factual Information Stored:**
+Not tech-savvy, prefers simple explanations
+Prefers phone calls over emails
+Best contact time: mornings before 11 AM
+Retired with time for detailed discussions
+Safety-conscious, values comprehensive coverage
+Prioritizes peace of mind over cost savings
 
 ### Implementation Architecture
 
 ```python
-async def generate_execution_plan(state: ProcessState) -> ProcessState:
-    """Generate a step-by-step execution plan using procedural memory"""
+async def generate_factual_aware_response(state: FactualMemoryState) -> FactualMemoryState:
+    """Generate response tailored to customer's factual profile"""
     
-    # Retrieve relevant procedures
-    procedures = []
-    for memory in state["procedural_knowledge"]:
-        content = memory.get('memory', '')
-        if content:
-            procedures.append(content)
+    # Extract factual information
+    factual_context = "\n".join([
+        memory.get('memory', '') for memory in state["factual_memories"]
+    ])
     
-    # Generate optimal execution plan
     prompt = f"""
-    Task Type: {state["task_type"]}
+    Customer Query: {state["customer_query"]}
     
-    Available Procedural Knowledge:
-    {procedural_context}
+    Customer's Known Preferences and Facts:
+    {factual_context if factual_context else "No preferences found"}
     
-    Generate a step-by-step plan that:
-    1. Lists each step in the correct order
-    2. Explains why the order matters
-    3. Identifies any cost-saving opportunities
-    4. Notes any dependencies between steps
+    Adapt your response to match their:
+    - Communication style (simple/technical)
+    - Contact preferences (email/phone/text)
+    - Risk tolerance (conservative/moderate/aggressive)
+    - Personal context (retired/busy/business owner)
     """
     
     response = await llm.ainvoke(prompt)
-    state["execution_plan"] = response.content.strip()
+    state["response"] = response.content.strip()
 ```
 
-### Key Features
-
-**Sequence Optimization**
-```python
-# Correct order saves money
-procedures = [
-    {
-        "content": "Teen driver addition optimal sequence: 
-        1) Apply good student discount first (15% for 3.0+ GPA), 
-        2) Then driver's education discount (10%), 
-        3) Then assign to oldest/safest vehicle, 
-        4) Finally enroll in monitoring program (20%). 
-        This order maximizes discount compounding.",
-        "metadata": {"type": "procedural_memory", "task": "teen_driver_addition"}
-    }
-]
-```
-
-### Use Cases
-
-1. **Multi-Policy Bundling**: "I'll bundle in this order: First home+auto for the 25% discount, then add umbrella for another 5%, maximizing your savings."
-
-2. **Complex Changes**: "When removing and adding vehicles, I'll FIRST process the removal to generate credit, THEN add the new one - this ensures proper prorated refunds."
-
-3. **Claim Filing Efficiency**: "Let me guide you through our streamlined process: 1) Document everything now, 2) File within 24 hours for priority handling, 3) Schedule adjuster visit, 4) Track expenses."
 
 ---
 
@@ -424,7 +409,7 @@ class IntegratedMemorySystem:
         self.memory_weights = {
             MemoryType.SHORT_TERM: 1.0,
             MemoryType.EPISODIC: 0.8,    
-            MemoryType.PROCEDURAL: 0.7,    
+            MemoryType.FACTUAL: 0.7,    
             MemoryType.SEMANTIC: 0.6       
         }
 ```
@@ -441,13 +426,14 @@ Memory Integration:
 - Short-term: Current conversation about teen driver
 - Episodic: Previous water damage, mother's medical needs
 - Semantic: How claims affect rates across different policy types
-- Procedural: Optimal teen driver addition process
+- Factual: Customer prefers simple explanations, conservative coverage
 
 Response: "I remember your water damage claim - I hope your mother's 
-equipment situation is stable now. Good news: home insurance claims 
-don't affect auto rates. For your son, with his grades and our 
-multi-policy discount, I can keep the increase to about $175/month 
-by optimizing the coverage assignment..."
+equipment situation is stable now. Good news in simple terms: home 
+insurance claims don't affect auto rates, they're separate. For your 
+son, I recommend comprehensive coverage for peace of mind. With his 
+good grades, the increase will be about $175/month. Shall I call you 
+tomorrow morning to finalize everything?"
 ```
 
 ## Getting Started
@@ -471,7 +457,7 @@ by optimizing the coverage assignment..."
 │   ├── 1_short_term_memory.ipynb
 │   ├── 2_semantic_memory.ipynb
 │   ├── 3_episodic_memory.ipynb
-│   ├── 4_procedural_memory.ipynb
+│   ├── 4_factual_memory.ipynb
 │   └── 5_integrated_memory.ipynb
 └── requirements.txt
 ```
@@ -482,4 +468,4 @@ By implementing these four types of memory, AI support systems transform from si
 - Never ask customers to repeat information (Short-term)
 - Understand domain concepts deeply (Semantic)
 - Remember each customer's unique journey (Episodic)
-- Execute processes optimally every time (Procedural)
+- Personalize every interaction to preferences (Factual)
