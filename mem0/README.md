@@ -11,6 +11,10 @@ Mem0’s memory layer combines LLMs with vector based storage. LLMs extract and 
 
 ## Mem0 + AWS
 
+Mem0 can be integrated with Bedrock models and OpenSearch serverless for vector store. Go through this example for more details - https://docs.mem0.ai/examples/aws_example
+
+For this demo we are going to use mem0 managed platform
+
 ### Importing LLMs from Amazon Bedrock
 
 **Strands Configuration:** 
