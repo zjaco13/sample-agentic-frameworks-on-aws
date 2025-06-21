@@ -2,17 +2,20 @@
 #Author: Chris Smith
 #Email: smithzgg@amazon.com
 #Created: 06/15/2025
-#Last Modified: 06/18/2025
+#Last Modified: 06/21/2025
 
 #Description:
 #    Deep Research MCP client using Llama4 built on the Strands
 #    framework using the Llama API.  This example is shows the typical multi-turn
 #    processing utilized for most Deep Research model orchestraion.  
 #    It uses AWS guardrails to allow for custom restrictions
-#    to the model behavoir if needed.
+#    to the model behavoir if needed. It also implements the ability to 
+#    search an internal AWS Knowledge base and incorporate the results into
+#    the final report.
+#    This version includes a UI.
 
 #Usage:
-#    \$ python <filename>.py 
+#    \$ streamlit run <filename>.py 
     
 #Dependencies:
 #    - mcp
@@ -42,7 +45,7 @@ USE_GUARDRAILS = "false"
 
 # Replace with your actual guardrail ID and version.  USE_GUARDRAILS must be set to true
 guardrail_id = "<Your Guardrail ID>"
-guardrail_version = "<GYour uardrail_version>"
+guardrail_version = "<Your Guardrail_version>"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 # Enables Strands debug log level
@@ -51,7 +54,7 @@ logging.getLogger("strands").setLevel(logging.ERROR)
 #Replace with you LLama AP key
 model = LlamaAPIModel(
     client_args={
-        "api_key": "<Your Llama API Key",
+        "api_key": "<Your Llama API Key>",
     },
     # **model_config
     max_tokens=8196,

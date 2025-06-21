@@ -9,7 +9,9 @@
 #    framework using the Llama API.  This example is shows the typical multi-turn
 #    processing utilized for most Deep Research model orchestraion.  
 #    It uses AWS guardrails to allow for custom restrictions
-#    to the model behavoir if needed.
+#    to the model behavoir if needed. It also implements the ability to 
+#    search an internal AWS Knowledge base and incorporate the results into
+#    the final report.
 
 #Usage:
 #    \$ python <filename>.py 
@@ -37,7 +39,7 @@ INTERNAL_SEARCH = "false"
 USE_GUARDRAILS = "false"
 
 # Replace with your actual guardrail ID and version
-guardrail_id = "<Your Guardrail ID"
+guardrail_id = "<Your Guardrail ID>"
 guardrail_version = "<Your Guardrail version>"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
