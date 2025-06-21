@@ -35,12 +35,14 @@ import streamlit as st
 #more questions = more depth, but more processing time and context
 #default is 3
 NUM_QUESTIONS = "3"
+#Set to true if you want to search internal AWS Knowledge Bases
 INTERNAL_SEARCH = "false"
+#Set to true if you want to enable custom AWS Guardrails
 USE_GUARDRAILS = "false"
 
-# Replace with your actual guardrail ID and version
-guardrail_id = "k4k67kbtf8eh"
-guardrail_version = "2"
+# Replace with your actual guardrail ID and version.  USE_GUARDRAILS must be set to true
+guardrail_id = "<Your Guardrail ID>"
+guardrail_version = "<GYour uardrail_version>"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 # Enables Strands debug log level
@@ -49,7 +51,7 @@ logging.getLogger("strands").setLevel(logging.ERROR)
 #Replace with you LLama AP key
 model = LlamaAPIModel(
     client_args={
-        "api_key": "LLM|1438469257464983|Fpc81PXFEsZQfu_s3rvTo2GudDM",
+        "api_key": "<Your Llama API Key",
     },
     # **model_config
     max_tokens=8196,
