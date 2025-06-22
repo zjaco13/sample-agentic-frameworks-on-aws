@@ -73,7 +73,7 @@ model = AnthropicModel(
 
 def create_streamable_http_transport():
    return streamablehttp_client("http://localhost:8000/mcp/")
-   #return streamablehttp_client("http://54.245.166.249:8000/mcp/")
+   
    
 
 # function to apply Bedrock Guardrails.  
