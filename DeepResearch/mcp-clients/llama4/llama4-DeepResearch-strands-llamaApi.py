@@ -9,9 +9,7 @@
 #    framework using the Llama API.  This example is shows the typical multi-turn
 #    processing utilized for most Deep Research model orchestraion.  
 #    It uses AWS guardrails to allow for custom restrictions
-#    to the model behavoir if needed. It also implements the ability to 
-#    search an internal AWS Knowledge base and incorporate the results into
-#    the final report.
+#    to the model behavoir if needed.
 
 #Usage:
 #    \$ python <filename>.py 
@@ -29,6 +27,9 @@ from mcp.client.streamable_http import streamablehttp_client
 import logging
 import boto3
 
+# set to 1 for verbose output
+DEBUG = 0
+
 #set this variable to the number of deep research questions you want to generate for the research topic
 #more questions = more depth, but more processing time and context
 #default is 3
@@ -39,8 +40,8 @@ INTERNAL_SEARCH = "false"
 USE_GUARDRAILS = "false"
 
 # Replace with your actual guardrail ID and version
-guardrail_id = "<Your Guardrail ID>"
-guardrail_version = "<Your Guardrail version>"
+guardrail_id = "<YOUR GUARDRAIL ID>"
+guardrail_version = "<YOUR GUARDRAIL VERSION>"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 # Enables Strands debug log level
@@ -49,10 +50,10 @@ logging.getLogger("strands").setLevel(logging.ERROR)
 #Replace with you LLama AP key
 model = LlamaAPIModel(
     client_args={
-        "api_key": "<Your Llama API Key>",
+        "api_key": "<YOUR ANTHROPIC API KEY>",
     },
     # **model_config
-    max_tokens=8196,
+    max_tokens=8192,
     model_id="Llama-4-Maverick-17B-128E-Instruct-FP8"
 )
 
@@ -97,12 +98,17 @@ def strands_turn(query: str, text: str) -> str:
 
 #start MCP Client
 streamable_http_mcp_client = MCPClient(create_streamable_http_transport)
+
 with streamable_http_mcp_client:
     #Get Tool List from MCP Server
     tools = streamable_http_mcp_client.list_tools_sync()
     #Initialize STrands Agent
     #callback_handler = None for silent mode
-    agent = Agent(model=model, tools=tools, callback_handler=None, system_prompt="You are a deep research assistant")
+     #callback_handler = None for silent mode
+    if (DEBUG) :
+        agent = Agent(model=model, tools=tools, system_prompt="You are a deep research assistant.") 
+    else:   
+        agent = Agent(model=model, tools=tools, callback_handler=None, system_prompt="You are a deep research assistant.")
 
     #User input loop
     while True:
@@ -112,7 +118,7 @@ with streamable_http_mcp_client:
         if query.lower() == 'quit':
             break
         # Step 1 - Generate 3 good deep research questions from the prompt        
-        question_prompt = "Generate " + NUM_QUESTIONS + " deep research questions from the following prompt separate each question with the | symbol:" + query
+        question_prompt = "Generate " + NUM_QUESTIONS + " deep research questions from the following prompt separate each question with the | symbol. Responds with only the questions." + query
         #Check to ensure the user prompt does not violate our internal rules
         if USE_GUARDRAILS.lower() == "true" :
             guardrail_response = apply_bedrock_guardrail(str(question_prompt), "INPUT")
@@ -127,37 +133,36 @@ with streamable_http_mcp_client:
             #questions_list = questions_str.split("|")
 
             #format final context
-            full_text = "[Content]"
+            full_text = "<CONTENT>"
             #lets do a web search on each question
             # separately and collate the responses
             for question in questions_list :
-                full_text = strands_turn("Perform a web search for the following question:" + question, full_text)
-               
+                full_text = strands_turn("Perform a web search for the following question perform a detailed analysis with supporing links on the results:" + question, full_text)
+                
             # For Deep research, we should also search ArXiv to see what recent papers have been published on
             # this topic
             full_text = strands_turn("Perform an arXiv search on the following subject: " + query, full_text)
             
-
             #lets also check the historical stock performance if applicable
             full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get stock info for it: " + query, full_text)
             
-
             #we can get detailed company information and recent news 
             full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get financial news for it: " + query, full_text)
             
-
               # Lets make sure to search our internal data sources also
             if INTERNAL_SEARCH.lower() == "true" : 
                 full_text = strands_turn("Search internal data sources for information on " + query, full_text)
             
+            full_text=full_text + "</CONTENT>"
 
-            full_text=full_text + "[Content]"
-
-            query="From <Content> generate a plan to write a detailed 1500 word report on this topic: " + full_text
-            plan = agent(query)
-            plan = "<plan>" + str(plan) + "</plan>"
-            final_query = "Execute this [plan] to generate a 1500 word report with the following sections 1/Executive Summary 2/Detailed Analysis, Supporting data, and 3/ Reference links to answer this question: " + query + " \n" + plan + "\n include this [Content] + \n" + full_text
-            
+            fquery="From [CONTENT] generate a plan to write a detailed 1500 word report on this topic: " + query
+            plan = agent(fquery)
+            plan = "<PLAN>" + str(plan) + "</PLAN>"
+            final_query = "Execute this [PLAN] to generate a 1500 word report with the following sections 1/ Executive Summary 2/ Detailed Analysis, 3 /Supporting data, and 4/ Reference links on this [SUBJECT]: <SUBJECT>" + query + "</SUBJECT> \n include [CONTENT].  \n" + plan + "\n \n" + full_text
+            if (DEBUG) :
+                print("-----------------------------------")
+                print(final_query)
+                print("-----------------------------------")
             final_report = agent(final_query)
             if USE_GUARDRAILS.lower() == "true" :
                 print(guardrail_check(str(final_report)))

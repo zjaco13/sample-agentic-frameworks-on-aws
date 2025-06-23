@@ -17,7 +17,7 @@
 #Dependencies:
 #    - mcp
 #    - strands
-
+#    - boto3
 
 
 from mcp.client.streamable_http import streamablehttp_client
@@ -36,11 +36,11 @@ NUM_QUESTIONS = "3"
 #set to true if you want to include searching internal AWS Knowledge Bases
 INTERNAL_SEARCH = "false"
 #set to true if you want to use custom AWS Guardrails
-USE_GUARDRAILS = "true"
+USE_GUARDRAILS = "false"
 
 # Replace with your actual guardrail ID and version
-guardrail_id = "<Your Guardrail ID here>"
-guardrail_version = "<Your Guardrail Version here>"
+guardrail_id = "k4k67kbtf8eh"
+guardrail_version = "2"
 #bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 
@@ -100,7 +100,10 @@ with streamable_http_mcp_client:
     tools = streamable_http_mcp_client.list_tools_sync()
     #Initialize STrands Agent
     #callback_handler = None for silent mode
-    agent = Agent(model=model, tools=tools, callback_handler=None, system_prompt="You are a very thorough deep research assistant.")
+    if (DEBUG) :
+        agent = Agent(model=model, tools=tools, system_prompt="You are a deep research assistant.") 
+    else:   
+        agent = Agent(model=model, tools=tools, callback_handler=None, system_prompt="You are a deep research assistant.")
 
     #User input loop
     while True:
@@ -123,38 +126,41 @@ with streamable_http_mcp_client:
             questions_str = str(response1)
             questions_list = questions_str.split("|")
             #format final context
-            time.sleep(60)
-            full_text = "[Content]"
+            full_text = "<CONTENT>"
+
             #lets do a web search on each question
             # separately and collate the responses
             for question in questions_list :
-                full_text = strands_turn("Perform a web search for the following question:" + question, full_text)
-           
+                full_text = strands_turn("Perform a web search for the following question perform a detailed analysis with supporing links on the results:" + question, full_text)
+            
             # For Deep research, we should also search ArXiv to see what recent papers have been published on
             # this topic
             full_text = strands_turn("Perform an arXiv search on the following subject: " + query, full_text)
-    
             
             #lets also check the historical stock performance if applicable
             full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get stock info for it: " + query, full_text)
-            
-
+               
             #finally we can get detailed company information and recent news 
-            full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get financial news for it: " + query)
-            
+            full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get financial news for it: " + query, full_text)
+         
              # Lets make sure to search our internal data sources also
             if INTERNAL_SEARCH.lower() == "true" : 
                 full_text = strands_turn("Search internal data sources for information on " + query, full_text)
             
-            full_text=full_text + "[Content]"
+            full_text=full_text + "</CONTENT>"
 
             #We take all the collated information and analzye, summarize and format a final report.
             #This section can be modified to create any desired report format
-            query="From <Content> generate a plan to write a detailed 1500 word report on this topic: " + full_text
-            plan = agent(query)
-            plan = "<plan>" + str(plan) + "</plan>"
-            final_query = "Execute this [plan] to generate a 1500 word report with the following sections 1/Executive Summary 2/Detailed Analysis, Supporting data, and 3/ Reference links to answer this question: " + query + " \n" + plan + "\n include this [Content] + \n" + full_text
-            
+            fquery="From [CONTENT] generate a plan to write a detailed 1500 word report on this topic: " + query
+            plan = agent(fquery)
+            plan = "<PLAN>" + str(plan) + "</PLAN>"
+            final_query = "Execute this [PLAN] to generate a 1500 word report with the following sections 1/ Executive Summary 2/ Detailed Analysis, 3 /Supporting data, and 4/ Reference links on this [SUBJECT]: <SUBJECT>" + query + "</SUBJECT> \n include [CONTENT].  \n" + plan + "\n \n" + full_text
+            if (DEBUG) :
+                print("-----------------------------------")
+                print(final_query)
+                print("-----------------------------------")
+          
+
             final_report = agent(final_query)
             if USE_GUARDRAILS.lower() == "true" :
                 print(guardrail_check(str(final_report)))
@@ -163,4 +169,4 @@ with streamable_http_mcp_client:
         
 
 
-           
+            

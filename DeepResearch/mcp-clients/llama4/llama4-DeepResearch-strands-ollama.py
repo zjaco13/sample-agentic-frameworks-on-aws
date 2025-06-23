@@ -1,12 +1,12 @@
-#File: claude4-DeepResearch-strands-api-workflow.py
+##File: llama4-DeepResearch-strands-ollama.py
 #Author: Chris Smith
 #Email: smithzgg@amazon.com
 #Created: 06/15/2025
 #Last Modified: 06/18/2025
 
 #Description:
-#    Deep Research MCP client using Claude4 built on the Strands
-#    framework using the Anthropic API.  This example is shows the typical multi-turn
+#    Deep Research MCP client using Llama4 built on the Strands
+#    framework using ollama for model hosting.  This example is shows the typical multi-turn
 #    processing utilized for most Deep Research model orchestraion.  
 #    It uses AWS guardrails to allow for custom restrictions
 #    to the model behavoir if needed.
@@ -19,13 +19,13 @@
 #    - strands
 #    - boto3
 
+
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent, tool
-from strands.models.anthropic import AnthropicModel
+from strands.models.ollama import OllamaModel
 from strands.tools.mcp.mcp_client import MCPClient
 import logging
 import boto3
-import time
 
 # set to 1 for verbose output
 DEBUG = 0
@@ -40,7 +40,7 @@ INTERNAL_SEARCH = "false"
 USE_GUARDRAILS = "false"
 
 # Replace with your actual guardrail ID and version
-guardrail_id = "<YOUR GUARDRAIL ID"
+guardrail_id = "<YOUR GUARDRAIL ID>"
 guardrail_version = "<YOUR GUARDRAIL VERSION>"
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
@@ -53,17 +53,11 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-model = AnthropicModel(
-    client_args={
-        "api_key": "<YOUR ANTHROPIC API KEY",
-    },
-    # **model_config
-    max_tokens=8196,
- #   model_id="claude-3-7-sonnet-20250219",
-    model_id="claude-sonnet-4-20250514",
-    params={
-        "temperature": 0.7,
-    }
+model = OllamaModel(
+    host="http://<YOUR_HOST_IP>:11434",  # Ollama server address
+    model_id="llama4:maverick",
+    keep_alive = "30m",
+    max_tokens = 8192
 )
 
 # Use this if you are running the MCP server on the same system, otherwise replace localhost 
@@ -71,6 +65,7 @@ model = AnthropicModel(
 
 def create_streamable_http_transport():
    return streamablehttp_client("http://localhost:8000/mcp/")
+
 
 # function to apply Bedrock Guardrails.  
 # Insert any custom Python code for additional guardrails
@@ -97,35 +92,24 @@ def guardrail_check(input: str) -> str:
     return gr_response
 
 def strands_turn(query: str, text: str) -> str:
-    if DEBUG:
-        print("Prompt: " + query)
-
-    if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(query), "INPUT") == "GUARDRAIL_INTERVENED"):
-            print("Guardrail intervened on the response:", guardrail_response["outputs"])
-            text = text + "I am sorry due to content restrictions, I cannot process this request"
-    else:     
-        response = agent(query)
-        if DEBUG:
-            print("Response: " + str(response))
-            #check to ensure the model's response do not violate any of our guardrails
-        if USE_GUARDRAILS.lower()=="true" :
-            text=text + guardrail_check(str(response))
-        else:
-            text = text + str(response)
-    return text  
+    response = agent(query)
+    #check to ensure the model's response do not violate any of our guardrails
+    if USE_GUARDRAILS.lower()=="true" :
+        text=text + guardrail_check(str(response))
+    else:
+        text = text + str(response)
+    return text
 
 
+
+#start MCP Client
 streamable_http_mcp_client = MCPClient(create_streamable_http_transport)
 
 # Use the MCP server in a context manager
-#start MCP Client
-
-streamable_http_mcp_client = MCPClient(create_streamable_http_transport)
-
 with streamable_http_mcp_client:
-    #Get Tool List from MCP Server
+    # Get the tools from the MCP server
     tools = streamable_http_mcp_client.list_tools_sync()
-    #Initialize STrands Agent
+#Initialize STrands Agent
     #callback_handler = None for silent mode
     if (DEBUG) :
         agent = Agent(model=model, tools=tools, system_prompt="You are a deep research assistant.") 
@@ -150,7 +134,6 @@ with streamable_http_mcp_client:
             print("I am sorry due to content restrictions, I cannot process this request")
         else:
             # Start Research
-            
             response1 = agent(question_prompt)
             questions_str = str(response1)
             questions_list = questions_str.split("|")
@@ -160,14 +143,14 @@ with streamable_http_mcp_client:
             #lets do a web search on each question
             # separately and collate the responses
             for question in questions_list :
-                 full_text = strands_turn("Perform a web search for the following question perform a detailed analysis with supporing links on the results:" + question, full_text)
-                 time.sleep(30)
+                full_text = strands_turn("Perform a web search for the following question and respond with a detailed analysis and supporing links:" + question, full_text)
+                
             # For Deep research, we should also search ArXiv to see what recent papers have been published on
             # this topic
             full_text = strands_turn("Perform an arXiv search on the following subject: " + query, full_text)
-            
+
             #lets also check the historical stock performance if applicable
-            full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get stock info for it: " + query, full_text)
+            full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get financial news for it: " + query, full_text)
             
             #we can get detailed company information and recent news 
             full_text = strands_turn("If the following prompt contains a company name, find the stock ticker for that company and get financial news for it: " + query, full_text)
@@ -178,17 +161,13 @@ with streamable_http_mcp_client:
             
             full_text=full_text + "</CONTENT>"
 
-        
             #We take all the collated information and analzye, summarize and format a final report.
             #This section can be modified to create any desired report format
-        
 
-            fquery="From <CONTENT> generate a plan to write a detailed 1500 word report on this topic: " + query
-            
+            fquery="From [CONTENT] generate a plan to write a detailed 1500 word report on this topic. Respond with only the plan: " + query
             plan = agent(fquery)
-            
             plan = "<PLAN>" + str(plan) + "</PLAN>"
-            final_query = "Execute this [PLAN] to generate a 1500 word report with the following sections 1/Executive Summary 2/Detailed Analysis with Supporting data, and 3/ Reference links to answer this [QUESTION]: <QUESTION>" + query + "</QUESTION> \n using this [CONTENT]. \n" + plan + "\n" + full_text
+            final_query = "Execute this [PLAN] to generate a 1500 word report with the following sections 1/ Executive Summary 2/ Detailed Analysis with supporting data.  Do not use bullet points, and 3/ Reference links on this [SUBJECT]: <SUBJECT>" + query + "</SUBJECT> \n include [CONTENT]. \n" + plan + "\n \n" + full_text
             if (DEBUG) :
                 print("-----------------------------------")
                 print(final_query)
@@ -199,5 +178,3 @@ with streamable_http_mcp_client:
             else:
                 print(str(final_report))
         
-
-            
