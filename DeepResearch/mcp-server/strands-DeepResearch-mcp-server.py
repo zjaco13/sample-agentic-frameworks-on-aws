@@ -37,18 +37,20 @@ from markitdown import MarkItDown
 from tavily import TavilyClient
 import boto3
 
+
+# 0.0.0.0 configures the server to listten on all ports.  Change the IP and/or port number if needed.
 mcp = FastMCP(host="0.0.0.0", port=8000, transport="streamable-http")
 mydirpath = "/Users/smithzgg/papers/"
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
 USER_AGENT = "weather-app/1.0"
 
-guardrail_id = "k4k67kbtf8eh"
-guardrail_version = "2"
-knowledge_base_id = "NMUAPATF8A"
+guardrail_id = "<YOUR AWS Guardrail ID>"
+guardrail_version = "<Your AWS Guardrail Version>"
+knowledge_base_id = "<Your AWS KB ID>"
 
 arxiv_client = arxiv.Client()
-tavily_client = TavilyClient(api_key="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")
+tavily_client = TavilyClient(api_key="<YOUR TAVILY API KEY>")
 md = MarkItDown()
 
 async def make_nws_request(url: str) -> dict[str, Any] | None:
