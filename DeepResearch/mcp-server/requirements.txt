@@ -1,0 +1,6 @@
+mcp
+arxiv
+yfinance
+markitdown
+tavily-python
+boto3
