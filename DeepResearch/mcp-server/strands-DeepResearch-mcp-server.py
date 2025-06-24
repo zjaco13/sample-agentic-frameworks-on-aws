@@ -38,19 +38,27 @@ from tavily import TavilyClient
 import boto3
 
 
+# set to 1 for verbose output
+DEBUG = 1
+#set to true if you want to include searching internal AWS Knowledge Bases
+INTERNAL_SEARCH = "false"
+#set to true if you want to use custom AWS Guardrails
+USE_GUARDRAILS = "false"
+
 # 0.0.0.0 configures the server to listten on all ports.  Change the IP and/or port number if needed.
 mcp = FastMCP(host="0.0.0.0", port=8000, transport="streamable-http")
-mydirpath = "/Users/smithzgg/papers/"
+# download path for ArXiv papers
+mydirpath = "<Your internal path here>"
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
 USER_AGENT = "weather-app/1.0"
 
-guardrail_id = "<YOUR AWS Guardrail ID>"
-guardrail_version = "<Your AWS Guardrail Version>"
-knowledge_base_id = "<Your AWS KB ID>"
+guardrail_id = "<YOUR GUARDRAIL ID HERE>"
+guardrail_version = "<YOUR GUARDRAIL VERSION HERE>"
+knowledge_base_id = "<YOUR KB ID HERE>"
 
 arxiv_client = arxiv.Client()
-tavily_client = TavilyClient(api_key="<YOUR TAVILY API KEY>")
+tavily_client = TavilyClient(api_key="<YOUR TAVILY KEY HERE>")
 md = MarkItDown()
 
 async def make_nws_request(url: str) -> dict[str, Any] | None:
@@ -63,6 +71,9 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
         try:
             response = await client.get(url, headers=headers, timeout=30.0)
             response.raise_for_status()
+            if (DEBUG) :
+                print("make_nws_request:" + url)
+                print(str(response.json))
             return response.json()
         except Exception:
             return None
@@ -146,19 +157,33 @@ Forecast: {period['detailedForecast']}
 
 @mcp.tool(description="Perform a search on an internal data source")
 def search_internal(subject: str) -> str:
-    bedrock_client = boto3.client('bedrock-agent-runtime', region_name="us-west-2")
-
-    response = bedrock_client.retrieve(
-        guardrailConfiguration={
-            'guardrailId': guardrail_id,
-            'guardrailVersion': guardrail_version
-        },
-        knowledgeBaseId=knowledge_base_id,
-        retrievalQuery={
-            'text': subject
-        }
-    )
-    print(str(response))
+    
+    if INTERNAL_SEARCH.lower() == "true" :
+        bedrock_client = boto3.client('bedrock-agent-runtime', region_name="us-west-2")
+        if USE_GUARDRAILS.lower() == "true":
+            response = bedrock_client.retrieve(
+                guardrailConfiguration={
+                    'guardrailId': guardrail_id,
+                    'guardrailVersion': guardrail_version
+                },
+                knowledgeBaseId=knowledge_base_id,
+                retrievalQuery={
+                    'text': subject
+                }
+            )
+        else:
+           response = bedrock_client.retrieve(
+                knowledgeBaseId=knowledge_base_id,
+                retrievalQuery={
+                    'text': subject
+                }
+            ) 
+    else:
+        response = "No Internal search data found" 
+    if (DEBUG):
+        print("search_internal:" + subject)
+        print(str(response.json))
+    return str(response)
 
 
 @mcp.tool(description="Get a list of ArXiv papers related to a subject")
@@ -181,6 +206,9 @@ def get_arxiv_list(subject: str) -> str:
     #print(all_results)
     #print([r.title for r in all_results])
     time.sleep(30)
+    if (DEBUG) :
+        print("***********get_arxiv_list: " + subject)
+        print(json.dumps(data))
     return (json.dumps(data))
 
 @mcp.tool(description="Get Contents of an ARXIV paper from the link")
@@ -197,7 +225,11 @@ def get_arxiv_content(link: str) -> str:
         # Expand the tilde (if part of the path) to the home directory path
         #expanded_path = os.path.expanduser(file_path)
         # Use markitdown to convert the PDF to text
-        return md.convert(mydirpath+paper_id+".pdf").text_content
+        response = md.convert(mydirpath+paper_id+".pdf").text_content
+        if (DEBUG) :
+            print("***********get_arxiv_content: " + link)
+            print(str(response))
+        return str(response)
     except Exception as e:
         # Return error message that the LLM can understand
         print( f"Error reading PDF: {str(e)}")
@@ -207,15 +239,17 @@ def get_arxiv_content(link: str) -> str:
 def tavily_web_search(question: str) -> str:
     gen_answer=tavily_client.search(question, search_depth="advanced", max_results = 1,
             topic="general", include_images=False, include_answer = "advanced")
-    print("Searching General....")
+    if (DEBUG):
+        print("Searching General...." + question)
     cur_answer=tavily_client.search(question, search_depth="advanced", max_results = 3,
             topic="news", include_images=False, days=30)
-    print("Searching news....")
-    print(question)
-    print("Response is")
+    if (DEBUG):
+        print("Searching news...." + question)
     answer = str(gen_answer) + " " + str(cur_answer)
-    print(answer)
     time.sleep(15)
+    if (DEBUG) :
+            print("*********** tavily web search: " + question)
+            print(str(answer))
     return answer
 
 @mcp.tool(description=""" get stock information for a company from its ticker symbol
@@ -249,7 +283,9 @@ async def get_stock_info(ticker: str ) -> str:
     hist_data = company.history(period="1mo", interval="1d")
     hist_data = hist_data.reset_index(names="Date")
     hist_data = hist_data.to_json(orient="records", date_format="iso")
-    print(hist_data)
+    if (DEBUG) :
+            print("*********** get stock info: " + ticker)
+            print(str(hist_data))
     return hist_data
 
 @mcp.tool(description=""" Get financial news for a company from its stock ticker
@@ -282,18 +318,25 @@ async def get_company_news(ticker: str ) -> str:
     info = str(company.info)
     news = str(company.news)
     report = info + news
-    print(report)
+    if (DEBUG) :
+            print("*********** get company news: " + ticker)
+            print(str(report))
     return report
 
 
 @mcp.tool(description="wait 10 seconds")
 def wait_10() :
     time.sleep(10)
+    if (DEBUG) :
+        print("Sleep 10 secs")
     return
 
 @mcp.tool(description="wait 60 seconds")
 def wait_60() :
     time.sleep(60)
+    if (DEBUG) :
+        print("Sleep 60 secs")
+           
     return
 
 mcp.run(transport="streamable-http")
