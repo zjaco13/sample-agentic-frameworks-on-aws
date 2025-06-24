@@ -111,7 +111,7 @@ After completing the installation and configuration steps, you can start the ser
 python strands-DeepResearch-mcp-server.py
 ```
 
-By default, the server will be accessible at http://0.0.0.0:8000. (all interfaces on port 800).
+By default, the server will be accessible at http://0.0.0.0:8000. (all interfaces on port 8000).
 To limit the server to spectifc interfaces update the 0.0.0.0 to the desired interface IP.  To restrict the server to local trafic only,
 Change it to http://localhost:8000 
 
