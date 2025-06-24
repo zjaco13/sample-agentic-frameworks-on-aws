@@ -53,8 +53,10 @@ Several key components need to be configured before running the server:
 
 Register for a Tavily API key at [tavily.com](https://tavily.com) and set it as an environment variable:
 
+Update the server source
+
 ```bash
-export TAVILY_API_KEY="your-tavily-api-key"
+tavily_client = TavilyClient(api_key="<YOUR TAVILY KEY HERE>")
 ```
 
 Or add it to the `.env` file in the project root:
@@ -65,14 +67,18 @@ TAVILY_API_KEY=your-tavily-api-key
 
 #### AWS Guardrails
 
-Configure AWS Guardrails by editing the `config/guardrails_config.json` file:
+If you want to enable custom guardrails based on AWS Bedrock Guardrails, update the source flag to "true"
 
-```json
-{
-  "guardrails_id": "your-guardrails-id",
-  "version": "latest",
-  "region": "your-aws-region"
-}
+```
+#set to true if you want to use custom AWS Guardrails
+USE_GUARDRAILS = "false"
+```
+
+and onfigure AWS Guardrails by editing the following code:
+
+```
+guardrail_id = "<YOUR GUARDRAIL ID HERE>"
+guardrail_version = "<YOUR GUARDRAIL VERSION HERE>"
 ```
 
 Refer to the AWS documentation on how to create and configure your Guardrails.
