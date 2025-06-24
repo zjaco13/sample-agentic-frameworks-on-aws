@@ -74,7 +74,7 @@ If you want to enable custom guardrails based on AWS Bedrock Guardrails, update 
 USE_GUARDRAILS = "false"
 ```
 
-and onfigure AWS Guardrails by editing the following code:
+and configure AWS Guardrails by editing the following code:
 
 ```
 guardrail_id = "<YOUR GUARDRAIL ID HERE>"
@@ -85,35 +85,35 @@ Refer to the AWS documentation on how to create and configure your Guardrails.
 
 #### AWS Knowledge Bases
 
-Set up your knowledge bases in the `config/knowledge_bases.json` file:
+If you want to enable an internal search source for deep research guardrails based on AWS Knowledge Bases, perform the following
+two steps
 
-```json
-{
-  "kb_list": [
-    {
-      "kb_id": "your-knowledge-base-id-1",
-      "region": "your-aws-region",
-      "description": "Knowledge Base 1 Description"
-    },
-    {
-      "kb_id": "your-knowledge-base-id-2",
-      "region": "your-aws-region",
-      "description": "Knowledge Base 2 Description"
-    }
-  ],
-  "default_kb_id": "your-knowledge-base-id-1"
-}
+First, update the source flag to "true"
+
 ```
+#set to true if you want to include searching internal AWS Knowledge Bases
+INTERNAL_SEARCH = "false"
+```
+
+and configure AWS Knowledge base integration by editing the following code:
+
+```
+knowledge_base_id = "<YOUR KB ID HERE>"
+```
+
+Refer to the AWS documentation on how to create and configure your Internal datasource with AWS Knowledge bases
 
 ## Usage
 
 After completing the installation and configuration steps, you can start the server with:
 
 ```bash
-python src/main.py
+python strands-DeepResearch-mcp-server.py
 ```
 
-By default, the server will be accessible at http://localhost:8000.
+By default, the server will be accessible at http://0.0.0.0:8000. (all interfaces on port 800).
+To limit the server to spectifc interfaces update the 0.0.0.0 to the desired interface IP.  To restrict the server to local trafic only,
+Change it to http://localhost:8000 
 
 ## Advanced Configuration
 
