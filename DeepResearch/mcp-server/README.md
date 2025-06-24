@@ -1,6 +1,6 @@
 
 
-This repository contains the code for the Deep Research Model Context Protocal Provider (MCP) server, which leverages advanced AI capabilities for deep research tasks.
+This repository contains the code for the Deep Research Model Context Protocal Provider (MCP) server, which leverages advanced AI capabilities for deep research tasks.  See the clients library for examples of clients for various models and hosting platforms.
 
 ## Prerequisites
 
