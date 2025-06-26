@@ -42,14 +42,12 @@ The client provides examples for using the different access methods:
 1. Native API (Llama API):
    ```python
    # Code to use the Llama API client
-  python3 llama4-DeepResearch-strands-llamaApi.py
-   
+   # python3 llama4-DeepResearch-strands-llamaApi.py
    ```
 
 2. AWS Bedrock:
    ```python
    # Code to use the AWS Bedrock client
-
    ```
 
 3. Ollama:
