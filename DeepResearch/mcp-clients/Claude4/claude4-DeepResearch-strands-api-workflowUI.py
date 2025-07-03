@@ -2,7 +2,7 @@
 #Author: Chris Smith
 #Email: smithzgg@amazon.com
 #Created: 06/15/2025
-#Last Modified: 06/18/2025
+#Last Modified: 07/1803/2025
 
 #Description:
 #    Deep Research MCP client using Claude4 built on the Strands
@@ -16,8 +16,11 @@
     
 #Dependencies:
 #    - mcp
-#    - strands
+#    - strands-agents
+#    - strands-agents-tools
 #    - boto3
+#    - anthropic
+#    - Streamlit
 
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent, tool
@@ -25,8 +28,9 @@ from strands.models.anthropic import AnthropicModel
 from strands.tools.mcp.mcp_client import MCPClient
 import logging
 import boto3
-import os
 import time
+import streamlit as st
+import os
 
 # set to 1 for verbose output
 DEBUG = 0
@@ -38,7 +42,7 @@ NUM_QUESTIONS = "3"
 #set to true if you want to include searching internal AWS Knowledge Bases
 INTERNAL_SEARCH = "false"
 #set to true if you want to use custom AWS Guardrails
-USE_GUARDRAILS = "true"
+USE_GUARDRAILS = "false"
 
 # Get environment
 
@@ -79,6 +83,11 @@ model = AnthropicModel(
     }
 )
 
+# Initialize chat history in session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+
 # Use this if you are running the MCP server on the same system, otherwise replace localhost 
 # with the IP address of the MCP Server
 
@@ -100,13 +109,17 @@ def apply_bedrock_guardrail(input_text, source):
 
 def guardrail_check(input: str) -> str:
      #check to ensure the model's response do not violate any of our guardrails
-    guardrail_response = apply_bedrock_guardrail(input, "OUTPUT")
-    #if they do, just do not record the response and continue to research
-    if guardrail_response == "GUARDRAIL_INTERVENED":
+    gr_response = input
+    if USE_GUARDRAILS.lower() == "true" :
+        if (DEBUG) :
+            st.write(f'Checking {input}')
+        guardrail_response = apply_bedrock_guardrail(input, "OUTPUT")
+        if (DEBUG) :
+            st.write(str(guardrail_response))
+        #if they do, just do not record the response and continue to research
+        if guardrail_response == "GUARDRAIL_INTERVENED":
             gr_response="This topic has triggered a guardrail and may not contain a complete response"
-            print("Guardrail intervened on the response:")
-    else:
-        gr_response=input
+            st.write("Uh-oh, this question has triggered my internal guardrails due to content restrictions, my answer may not include all the relevant data")
     return gr_response
 
 def strands_turn(query: str, text: str) -> str:
@@ -114,9 +127,9 @@ def strands_turn(query: str, text: str) -> str:
         print("Prompt: " + query)
 
     if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(query), "INPUT") == "GUARDRAIL_INTERVENED"):
-            print("Guardrail intervened on the response:")
+            st.write("Uh-oh, this question has triggered my internal guardrails due to content restrictions, my answer may not include all the relevant data")
             text = text + "I am sorry due to content restrictions, I cannot process this request"
-    else:     
+    else:
         try:     
             response = agent(query)
         except Exception as e:
@@ -138,35 +151,38 @@ def strands_turn(query: str, text: str) -> str:
 
 def my_callback_handler(**kwargs) :
 
-    if "message" in kwargs and kwargs["message"].get("role") == "assistant" :
-        for content in kwargs["message"]["content"] :
-            if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(content), "INPUT") == "GUARDRAIL_INTERVENED"):
-                print("Uh-oh, this question has triggered my internal guardrails due to content restrictions, my answer may not include all the relevant data")
-            else:
-                if "text" in content:
-                    #print("\n\n------------------------------------")                    #print(str(kwargs))
-                    print(f'Research Assistant: {content["text"]}')
-                    #print("------------------------------------\n")
-               
-                if "toolUse" in content :
-                    if str(content["toolUse"]["name"]) == "tavily_web_search" :
-                        print(f'\nResearch Assistant: Doing a web search on {content["toolUse"]["input"]["question"]}')
-                    elif str(content["toolUse"]["name"]) == "wait_60" :
-                        print("\nProcessing result...\n")
-                    elif str(content["toolUse"]["name"]) == "get_arxiv_list" :
-                        print(f'\nResearch Assistant: Doing an ArXiv Search on {content["toolUse"]["input"]["subject"]}')
-                    elif str(content["toolUse"]["name"]) == "get_stock_info" :
-                        print(f'\nResearch Assistant: Retieving current stock information on {content["toolUse"]["input"]["ticker"]}')
-                    elif str(content["toolUse"]["name"]) == "get_company_news" :
-                        print(f'\nResearch Assistant: Getting current financial news and company information {content["toolUse"]["input"]["ticker"]}')
-                    else:
-                        if (DEBUG) :
-                            print("----------------TOOL CALL----------------------")
-                            #print(str(kwargs))
-                            print(str(content["toolUse"].get("name")))
-                            print(str(content["toolUse"].get("input")))
-                            print("------------------------------------")
-      
+        if "message" in kwargs and kwargs["message"].get("role") == "assistant" :
+            for content in kwargs["message"]["content"] :
+                if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(content), "INPUT") == "GUARDRAIL_INTERVENED"):
+
+                    st.write("Uh-oh, this question has triggered my internal guardrails due to content restrictions, my answer may not include all the relevant data")
+                else:
+                    if "text" in content:
+                        #print(str(kwargs))
+                        st.write(f'**Research Assistant:** {content["text"]}')
+                    
+                    if "toolUse" in content :
+                        if str(content["toolUse"]["name"]) == "tavily_web_search" :
+                            st.write(f'\n**Research Assistant:** Doing a web search on {content["toolUse"]["input"]["question"]}')
+                        elif str(content["toolUse"]["name"]) == "wait_60" :
+                            st.write("\nProcessing result...\n")
+                        elif str(content["toolUse"]["name"]) == "get_arxiv_list" :
+                            st.write(f'\n**Research Assistant:** Doing an ArXiv Search on {content["toolUse"]["input"]["subject"]}')
+                        elif str(content["toolUse"]["name"]) == "get_stock_info" :
+                            st.write(f'\n**Research Assistant:** Retieving current stock information on {content["toolUse"]["input"]["ticker"]}')
+                        elif str(content["toolUse"]["name"]) == "get_company_news" :
+                            st.write(f'\n**Research Assistant:** Getting current financial news and company information {content["toolUse"]["input"]["ticker"]}')
+                        else:
+                            if (DEBUG) :
+                                print("----------------TOOL CALL----------------------")
+                                #print(str(kwargs))
+                                print(str(content["toolUse"].get("name")))
+                                print(str(content["toolUse"].get("input")))
+                                print("------------------------------------")
+
+
+
+st.title("Deep Research Agent")      
 streamable_http_mcp_client = MCPClient(create_streamable_http_transport)
 
 # Use the MCP server in a context manager
@@ -180,29 +196,29 @@ with streamable_http_mcp_client:
     #Initialize STrands Agent
     #callback_handler = None for silent mode
     if (DEBUG) :
-        agent = Agent(model=model, tools=tools, system_prompt="You are a deep research assistant.") 
+        agent = Agent(model=model, tools=tools, system_prompt="You are a deep research assistant. Please wait 10 second between tool calls.") 
     else:   
         agent = Agent(model=model, tools=tools, callback_handler=my_callback_handler, system_prompt="You are a deep research assistant.")
 
-    #User input loop
-    while True:
-        #get User Input
-        query = input("\nQuery: ").strip()
-        # type 'quit' to exit loop gracefully
-        if query.lower() == 'quit':
-            break
-        # Step 1 - Generate 3 good deep research questions from the prompt        
+  
+    #get User Input
+    if query := st.chat_input("What would you like to research today?"):
+         # type 'quit' to exit loop gracefully
+        if (query.lower() == "quit") :
+            st.write("Goodbye!")
+            exit()
+        st.write(f"Topic: ** {query} **")
+        # Step 1 - Generate 3 good deep research questions from the prompt 
+         
         question_prompt = "Generate " + NUM_QUESTIONS + " deep research questions from the following prompt separate each question with the | symbol. Respond with only the questions:" + query
         #Check to ensure the user prompt does not violate our internal rules
         if USE_GUARDRAILS.lower() == "true" :
             guardrail_response = apply_bedrock_guardrail(str(question_prompt), "INPUT")
         #if it does, just abort and prompt for the next question
         if USE_GUARDRAILS.lower() == "true" and guardrail_response == "GUARDRAIL_INTERVENED":
-            print("Guardrail intervened on the response:")
-            print("I am sorry due to content restrictions, I cannot process this request")
+            st.write("uh-oh, I apologize, but I am not allowed to process this request due to content restrictions")
         else:
             # Start Research
-            
             try:     
                 response1 = agent(question_prompt)
             except Exception as e:
@@ -221,8 +237,10 @@ with streamable_http_mcp_client:
             #lets do a web search on each question
             # separately and collate the responses
             for question in questions_list :
-                 full_text = strands_turn("Perform a web search for the following question perform a detailed analysis with supporing links on the results:" + question, full_text)
+                 st.write(f"**QUESTION** {guardrail_check(question)}")
+                 full_text = strands_turn("Perform a web search on the following question perform a detailed analysis with supporing links on the results:" + question, full_text)
                  time.sleep(30)
+                 
             # For Deep research, we should also search ArXiv to see what recent papers have been published on
             # this topic
             full_text = strands_turn("Perform an arXiv search on the following subject: " + query, full_text)
@@ -257,12 +275,14 @@ with streamable_http_mcp_client:
                 time.sleep(60)
                 plan = agent(fquery)
             
+            
             plan = "<PLAN>" + str(plan) + "</PLAN>"
             final_query = "Execute this [PLAN] to generate a 1500 word report with the following sections 1/Executive Summary 2/Detailed Analysis with Supporting data, and 3/ Reference links to answer this [QUESTION]: <QUESTION>" + query + "</QUESTION> \n using this [CONTENT]. \n" + plan + "\n" + full_text
             if (DEBUG) :
                 print("-----------------------------------")
                 print(final_query)
                 print("-----------------------------------")
+
             try:     
                 final_report = agent(final_query)
             except Exception as e:
@@ -271,9 +291,8 @@ with streamable_http_mcp_client:
                     print("Error Identified - Backing off")
                     print(e["error"])
                 time.sleep(60)
-                final_report = agent(final_query)
-            
-        print("Report Complete - Do you have another research topic?")
+                final_report = agent(final_query)  
+        st.write("Report Complete - Do you have another research topic?")
         
 
             

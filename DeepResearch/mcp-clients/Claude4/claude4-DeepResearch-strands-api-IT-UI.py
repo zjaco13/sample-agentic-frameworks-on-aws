@@ -3,7 +3,7 @@
 #Author: Chris Smith
 #Email: smithzgg@amazon.com
 #Created: 06/15/2025
-#Last Modified: 06/18/2025
+#Last Modified: 07/03/2025
 
 #Description:
 #    Deep Research MCP client using Claude4 built on the Strands
@@ -17,8 +17,11 @@
     
 #Dependencies:
 #    - mcp
-#    - strands
+#    - strands-agents
+#    - strands-agents-tools
 #    - boto3
+#    - anthropic
+#    - time
 
 from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent, tool
@@ -26,6 +29,9 @@ from strands.models.anthropic import AnthropicModel
 from strands.tools.mcp.mcp_client import MCPClient
 import logging
 import boto3
+import os
+import time
+import streamlit as st
 
 DEBUG = 0
 #set this variable to the number of deep research questions you want to generate for the research topic
@@ -38,9 +44,21 @@ INTERNAL_SEARCH = "false"
 USE_GUARDRAILS = "false"
 
 
-# Replace with your actual guardrail ID and version
-guardrail_id = "<Your Guardrails ID Here>"
-guardrail_version = "<Your Guardrails Version Here>"
+# Get environment
+
+#set AWS_GUARDRAIL_ID and AWS_GUARDRAIL_VERSION if you intend on using AWS Guardrails
+if USE_GUARDRAILS.lower() == "true" :
+    guardrail_id = os.getenv("AWS_GUARDRAIL_ID")
+    guardrail_version = os.getenv("AWS_GUARDRAIL_VERSION")
+
+#Set the MCP Server to the server connect string
+# example:  export MCP_SERVER="http://localhost:8000/mcp/" for a local server
+# or export MCP_SERVER="http://10.10.10.10:8000/mcp/"   for a remote MCP server
+
+mcp_server=os.getenv("MCP_SERVER")
+
+# Set your Anthropic API KEY.  Go to https://docs.anthropic.com/en/api/admin-api/apikeys/get-api-key
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 bedrock_runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 # Enables Strands debug log level
@@ -54,7 +72,7 @@ logging.basicConfig(
 
 model = AnthropicModel(
     client_args={
-        "api_key": "<Your Anthropic API Key Here>",
+        "api_key": anthropic_api_key,
     },
     # **model_config
     max_tokens=8196,
@@ -73,9 +91,11 @@ model = AnthropicModel(
 )
 
 def create_streamable_http_transport():
-   return streamablehttp_client("http://localhost:8000/mcp/")
-   #return streamablehttp_client("http://54.245.166.249:8000/mcp/")
+   return streamablehttp_client(mcp_server)
    
+ # Initialize chat history in session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []  
 
 # function to apply Bedrock Guardrails.  
 # Insert any custom Python code for additional guardrails
@@ -94,32 +114,36 @@ def my_callback_handler(**kwargs) :
 
         if "message" in kwargs and kwargs["message"].get("role") == "assistant" :
             for content in kwargs["message"]["content"] :
-                if "text" in content:
-                    print("\n\n------------------------------------")
-                    #print(str(kwargs))
-                    print(content["text"])
-                    print("------------------------------------\n")
-                    
-                if "toolUse" in content :
-                    if str(content["toolUse"]["name"]) == "tavily_web_search" :
-                        print(f'\nAssistant: Doing a web search on {content["toolUse"]["input"]["question"]}')
-                    elif str(content["toolUse"]["name"]) == "wait_60" :
-                        print("\nProcessing result...\n")
-                    elif str(content["toolUse"]["name"]) == "get_arxiv_list" :
-                        print(f'\nAssistant: Doing an ArXiv Search on {content["toolUse"]["input"]["subject"]}')
-                    elif str(content["toolUse"]["name"]) == "get_stock_info" :
-                        print(f'\nAssistant: Retieving current stock information on {content["toolUse"]["input"]["ticker"]}')
-                    elif str(content["toolUse"]["name"]) == "get_company_news" :
-                        print(f'\nAssistant: Getting current financial news and company information {content["toolUse"]["input"]["ticker"]}')
-                    else:
-                        if (DEBUG) :
-                            print("----------------TOOL CALL----------------------")
-                            #print(str(kwargs))
-                            print(str(content["toolUse"].get("name")))
-                            print(str(content["toolUse"].get("input")))
-                            print("------------------------------------")
-         
+                if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(content), "INPUT") == "GUARDRAIL_INTERVENED"):
 
+                    st.write("Uh-oh, this question has triggered my internal guardrails due to content restrictions, my answer may not include all the relevant data")
+                else:
+                    if "text" in content:
+                        #print("\n\n------------------------------------")
+                        #print(str(kwargs))
+                        st.write(f'**Research Assistant:** {content["text"]}')
+                        #print("------------------------------------\n")
+                    
+                    if "toolUse" in content :
+                        if str(content["toolUse"]["name"]) == "tavily_web_search" :
+                            st.write(f'\n**Research Assistant:** Doing a web search on {content["toolUse"]["input"]["question"]}')
+                        elif str(content["toolUse"]["name"]) == "wait_60" :
+                            st.write("\nProcessing result...\n")
+                        elif str(content["toolUse"]["name"]) == "get_arxiv_list" :
+                            st.write(f'\n**Research Assistant:** Doing an ArXiv Search on {content["toolUse"]["input"]["subject"]}')
+                        elif str(content["toolUse"]["name"]) == "get_stock_info" :
+                            st.write(f'\n**Research Assistant:** Retieving current stock information on {content["toolUse"]["input"]["ticker"]}')
+                        elif str(content["toolUse"]["name"]) == "get_company_news" :
+                            st.write(f'\n**Research Assistant:** Getting current financial news and company information {content["toolUse"]["input"]["ticker"]}')
+                        else:
+                            if (DEBUG) :
+                                print("----------------TOOL CALL----------------------")
+                                #print(str(kwargs))
+                                print(str(content["toolUse"].get("name")))
+                                print(str(content["toolUse"].get("input")))
+                                print("------------------------------------")
+                   
+st.title("Deep Research Agent")   
 streamable_http_mcp_client = MCPClient(create_streamable_http_transport)
 
 # Use the MCP server in a context manager
@@ -138,7 +162,7 @@ with streamable_http_mcp_client:
         "   * Executive Summary - Summarize the deep analysis into a single paragraph that provides all the key information "
         "   * Details - Provide a 1 page response that supports the information in the executive summary "
         "   * Follow-up section - Provide any follow-up web links that support the information provided that the user can use to get more detailed if needed "
-        "IMPORTANT: Always wait 60 seconds between tool calls")
+       )
     else:
         sys_prompt = ("You are an experience research assistant.  When given a topic to reseach, you perform the following tasks in order: "
         "1. Generate " + NUM_QUESTIONS + " deep reaseach questions from the prompt "
@@ -151,35 +175,39 @@ with streamable_http_mcp_client:
         "   * Executive Summary - Summarize the deep analysis into a single paragraph that provides all the key information "
         "   * Details - Provide a 1 page response that supports the information in the executive summary "
         "   * Follow-up section - Provide any follow-up web links that support the information provided that the user can use to get more detailed if needed "
-        "IMPORTANT: Always wait 60 seconds between tool calls")
-
-
-    
+        )
 
     # Create an agent with the MCP tools
     agent = Agent(model=model, tools=tools, callback_handler = my_callback_handler, system_prompt=sys_prompt)
    
-    while True:
-        try:
-            query = input("\nQuery: ").strip()
-                
-            if query.lower() == 'quit':
-                break
-            if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(query), "INPUT") == "GUARDRAIL_INTERVENED"):
-                #if it does, just abort and prompt for the next question
-                #print("Guardrail intervened on the response:", guardrail_response["outputs"])
-                print("I am sorry due to content restrictions, I cannot process this request")
-            else:
+    if query := st.chat_input("What would you like to research today?"):   
+         
+        if (query.lower() == "quit") :
+            st.write("Goodbye!")
+            exit()
+        st.write(f"Topic: ** {query} **")       
+            
+        if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(query), "INPUT") == "GUARDRAIL_INTERVENED"):
+            #if it does, just abort and prompt for the next question
+            #print("Guardrail intervened on the response:", guardrail_response["outputs"])
+            st.write("I am sorry due to content restrictions, I cannot process this request")
+        else:
+            try:     
+                response = agent(query)
+            except Exception as e:
+            
+                print("ERROR CAUGHT")
+                print("Error Identified - Backing off")
+                print(e["error"])
+                time.sleep(60)
                 response = agent(query)
         
-                if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(response), "OUTPUT") == "GUARDRAIL_INTERVENED") :
-                    #if they do, just do not record the response and continue to research
-                    print("This topic has triggered a guardrail and may not contain a complete response")
-                    #print("Guardrail intervened on the response:", guardrail_response["outputs"])
-                else:
-                    #print("\n" + str(response)) 
-                    print("Report Complete - do yu have another research topic?")                
-        except Exception as e:
-            print(f"\nError: {str(e)}")
+            if (USE_GUARDRAILS.lower() == "true") and (apply_bedrock_guardrail(str(response), "OUTPUT") == "GUARDRAIL_INTERVENED") :
+            #if they do, just do not record the response and continue to research
+                st.write("This topic has triggered a guardrail and may not contain a complete response")
+                st.write("Report Complete - do you have another research topic?")  
+            #print("Guardrail intervened on the response:", guardrail_response["outputs"])
+            else:
+                st.write("Report Complete - do you have another research topic?")               
 
     
