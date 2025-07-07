@@ -1,7 +1,7 @@
-## 3P Agentic Frameworks
+## Agentic Frameworks on AWS
 
 <p align="center">
-  <img src="docs/agentic-frameworks-aws.png" alt="Project banner" width="1000">
+  <img src="docs/agentic-frameworks-on-aws.png" alt="Project banner" width="1000">
 </p>
 
 [![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
@@ -34,6 +34,7 @@ This repository provides examples and reference architectures for building auton
 - [📜 Automating regulatory compliance: A multi-agent solution using Amazon Bedrock and CrewAI](https://aws.amazon.com/blogs/machine-learning/automating-regulatory-compliance-a-multi-agent-solution-using-amazon-bedrock-and-crewai/)
 
 ## 💼 Workshops
+- [Observability and Evals for AI Agents using Langfuse](https://catalog.us-east-1.prod.workshops.aws/workshops/044ae389-0aa4-4c30-8caa-dd44cd1caf40/en-US)
 - [LangGraph Agents with Amazon Bedrock](https://github.com/aws-samples/langgraph-agents-with-amazon-bedrock)
 - [Building Effective AI Agents on Amazon Web Services](https://catalog.workshops.aws/building-effective-ai-agents-on-aws/en-US)
 
