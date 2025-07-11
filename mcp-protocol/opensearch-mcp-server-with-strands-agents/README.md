@@ -11,7 +11,7 @@ The server acts as a bridge between AI models and OpenSearch clusters, supportin
 - Seamless integration with AI assistants and LLMs through the MCP protocol
 - Support for both stdio and streaming server transports (SSE and Streamable HTTP)
 - Built-in tools for common OpenSearch operations
-- Easy integration with Q Developer CLI, Claude Desktop, and LangChain
+- Easy integration with Q Developer CLI, Claude Desktop, LangChain, and Strands Agents
 - Secure authentication using basic auth or IAM roles
 - Multi-cluster support
 - Tool filtering capabilities
@@ -31,3 +31,7 @@ pip install opensearch-mcp-server-py
 - [CountTool](https://docs.opensearch.org/docs/latest/api-reference/search-apis/count/): Returns number of documents matching a query.
 - [ExplainTool](https://docs.opensearch.org/docs/latest/api-reference/search-apis/explain/): Returns information about why a specific document matches (or doesn't match) a query.
 - [MsearchTool](https://docs.opensearch.org/docs/latest/api-reference/search-apis/multi-search/): Allows to execute several search operations in one request.
+
+## Integration with Strands Agents
+
+See [opensearch_mcp_server](opensearch_mcp_server.ipynb) notebook for a comprehensive demonstration of integrating OpenSearch MCP server with Strands Agents.
