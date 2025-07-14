@@ -1,0 +1,64 @@
+.DS_Store
+.idea
+.build
+*.old
+
+# ignore the lock file
+website/package-lock.json
+
+# Local .terraform directories
+**/.terraform/*
+**/_LOCAL/*
+
+# Terraform lockfile
+.terraform.lock.hcl
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+terraform-apply.log
+
+# Crash log files
+crash.log
+
+# Ignore override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Locals
+kubeconfig*
+kube-config*
+local_tf_state/
+.vscode
+.gitallowed
+site
+.env*
+
+# Checks
+.tfsec
+
+# venv
+**/.venv/*
+
+# Python cache files
+**/__pycache__/
+*.py[cod]
+*$py.class
+blueprints/agentic/multi-agent-strands-bedrock/test_bedrock.py
+
+# gradio
+**/gradio_cached_examples
+
+# node modules
+node_modules
+
+*.log
