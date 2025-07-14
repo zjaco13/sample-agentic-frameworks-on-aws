@@ -1,0 +1,10 @@
+{{- if (index .Values.mcp "mcp.json") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agent.fullname" . }}-mcp-config
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+data:
+  mcp.json: {{ index .Values.mcp "mcp.json" | quote }}
+{{- end }}
