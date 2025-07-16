@@ -1,0 +1,40 @@
+{
+  "limit_requests": [
+    {
+      "request_id": 1001,
+      "customer_id": "CUST_001",
+      "feature_id": "API_CALLS",
+      "feature_name": "API Rate Limit",
+      "default_limit": 1000,
+      "current_limit": 1000,
+      "requested_limit": 2500,
+      "status": "PENDING",
+      "request_date": "2024-06-12T09:30:00",
+      "last_updated": "2024-06-12T09:30:00"
+    },
+    {
+      "request_id": 1002,
+      "customer_id": "CUST_002",
+      "feature_id": "STORAGE",
+      "feature_name": "Storage Capacity (GB)",
+      "default_limit": 500,
+      "current_limit": 1000,
+      "requested_limit": 2000,
+      "status": "APPROVED",
+      "request_date": "2024-06-11T14:20:00",
+      "last_updated": "2024-06-12T10:15:00"
+    },
+    {
+      "request_id": 1003,
+      "customer_id": "CUST_003",
+      "feature_id": "CONCURRENT_USERS",
+      "feature_name": "Concurrent User Sessions",
+      "default_limit": 100,
+      "current_limit": 100,
+      "requested_limit": 250,
+      "status": "IN_REVIEW",
+      "request_date": "2024-06-12T11:45:00",
+      "last_updated": "2024-06-12T11:45:00"
+    }
+  ]
+}
