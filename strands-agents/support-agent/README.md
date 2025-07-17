@@ -21,6 +21,12 @@ This project demonstrates the construction of an advanced customer support agent
 - SQLite integration for operational data management
 - Amazon Bedrock Knowledge Base for comprehensive troubleshooting information
 
+
+
+![Architecture Diagram](architecture_diagram.png)
+
+
+
 ## Prerequisites
 
 1. **Infrastructure Setup**
