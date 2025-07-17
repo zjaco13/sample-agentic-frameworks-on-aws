@@ -15,3 +15,6 @@ sessions/
 .env
 
 *-values.yaml
+
+AmazonQ.md
+.amazonq/
