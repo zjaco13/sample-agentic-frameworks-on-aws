@@ -72,7 +72,6 @@ COPY --from=uv --chown=app:app /app/.venv /app/.venv
 
 # Copy configuration files needed at runtime
 COPY --from=uv --chown=app:app /app/agent.md    /app/agent.md
-COPY --from=uv --chown=app:app /app/mcp.json    /app/mcp.json
 COPY --from=uv --chown=app:app /app/mcp-servers /app/mcp-servers
 
 
