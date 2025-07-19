@@ -1,0 +1,138 @@
+{
+  "limit_requests": [
+    {
+      "request_id": 1001,
+      "customer_id": "CUST_001",
+      "feature_id": "API_CALLS",
+      "feature_name": "API Rate Limit",
+      "default_limit": 1000,
+      "current_limit": 1000,
+      "requested_limit": 2500,
+      "status": "PENDING",
+      "request_date": "2024-06-12T09:30:00",
+      "last_updated": "2024-06-12T09:30:00"
+    },
+    {
+      "request_id": 1002,
+      "customer_id": "CUST_002",
+      "feature_id": "STORAGE",
+      "feature_name": "Storage Capacity (GB)",
+      "default_limit": 500,
+      "current_limit": 1000,
+      "requested_limit": 2000,
+      "status": "APPROVED",
+      "request_date": "2024-06-11T14:20:00",
+      "last_updated": "2024-06-12T10:15:00"
+    },
+    {
+      "request_id": 1003,
+      "customer_id": "CUST_003",
+      "feature_id": "CONCURRENT_USERS",
+      "feature_name": "Concurrent User Sessions",
+      "default_limit": 100,
+      "current_limit": 100,
+      "requested_limit": 250,
+      "status": "IN_REVIEW",
+      "request_date": "2024-06-12T11:45:00",
+      "last_updated": "2024-06-12T11:45:00"
+    }
+  ],
+  "billing_records": [
+    {
+      "billing_id": 1001,
+      "customer_id": "CUST_001",
+      "invoice_date": "2024-06-01",
+      "amount": 500.00,
+      "status": "PAID",
+      "payment_method": "Credit Card ending in 1234",
+      "last_four": "1234"
+    },
+    {
+      "billing_id": 1002,
+      "customer_id": "CUST_002",
+      "invoice_date": "2024-06-01",
+      "amount": 750.50,
+      "status": "UNPAID",
+      "payment_method": "Credit Card ending in 5678",
+      "last_four": "5678"
+    },
+    {
+      "billing_id": 1003,
+      "customer_id": "CUST_003",
+      "invoice_date": "2024-06-01",
+      "amount": 1000.00,
+      "status": "REFUND_REQUESTED",
+      "payment_method": "PayPal",
+      "last_four": null
+    },
+    {
+      "billing_id": 1004,
+      "customer_id": "CUST_001",
+      "invoice_date": "2024-06-15",
+      "amount": 750.00,
+      "status": "PENDING",
+      "payment_method": "Credit Card ending in 1234",
+      "last_four": "1234"
+    }
+  ],
+  "refund_requests": [
+    {
+      "refund_id": 2001,
+      "customer_id": "CUST_003",
+      "billing_id": 1003,
+      "request_date": "2024-06-05",
+      "amount": 1000.00,
+      "status": "PROCESSING"
+    },
+    {
+      "refund_id": 2002,
+      "customer_id": "CUST_001",
+      "billing_id": 1001,
+      "request_date": "2024-06-10",
+      "amount": 100.00,
+      "status": "APPROVED"
+    },
+    {
+      "refund_id": 2003,
+      "customer_id": "CUST_002",
+      "billing_id": 1002,
+      "request_date": "2024-06-15",
+      "amount": 50.50,
+      "status": "PENDING"
+    }
+  ],
+  "customer_feedback": [
+    {
+      "feedback_id": 3001,
+      "customer_id": "CUST_001",
+      "service": "Compute",
+      "rating": 4,
+      "comment": "Great performance, but setup was a bit complex.",
+      "date": "2024-06-10"
+    },
+    {
+      "feedback_id": 3002,
+      "customer_id": "CUST_002",
+      "service": "Storage",
+      "rating": 5,
+      "comment": "Excellent reliability and easy to use.",
+      "date": "2024-06-11"
+    },
+    {
+      "feedback_id": 3003,
+      "customer_id": "CUST_003",
+      "service": "Database",
+      "rating": 3,
+      "comment": "Good performance but pricing could be more competitive.",
+      "date": "2024-06-12"
+    },
+    {
+      "feedback_id": 3004,
+      "customer_id": "CUST_001",
+      "service": "API Gateway",
+      "rating": 5,
+      "comment": "Very reliable and great documentation.",
+      "date": "2024-06-15"
+    }
+  ]
+}

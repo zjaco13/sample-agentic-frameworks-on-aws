@@ -1,3 +1,4 @@
+# Use this to specify the location of the remote mcp servers, overrides the default mcp.json in values.yaml inside the helm chart
 mcp:
   mcp.json: |
     {

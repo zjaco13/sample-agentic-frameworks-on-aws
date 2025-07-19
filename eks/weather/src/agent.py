@@ -26,6 +26,24 @@ from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
 from strands.types.content import Messages
 from . import agent_tools
 
+# Default MCP configuration when mcp.json is not found
+DEFAULT_MCP_CONFIG = """{
+  "mcpServers": {
+    "weather-mcp-stdio": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        ".",
+        "--directory",
+        "mcp-servers/weather-mcp-server",
+        "mcp-server",
+        "--transport",
+        "stdio"
+      ]
+    }
+  }
+}"""
+
 
 def load_agent_config(config_file: Optional[str] = None) -> Tuple[str, str, str]:
     """
@@ -219,15 +237,19 @@ def _load_mcp_tools_from_config() -> List[Any]:
         config_path = config_locations[0]
 
     if not os.path.exists(config_path):
-        logger.warning(f"MCP configuration file not found at {config_path}")
-        return []
-
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-    except Exception as e:
-        logger.error(f"Error reading MCP configuration: {str(e)}")
-        return []
+        logger.warning(f"MCP configuration file not found at {config_path}, using default configuration")
+        try:
+            config = json.loads(DEFAULT_MCP_CONFIG)
+        except Exception as e:
+            logger.error(f"Error parsing default MCP configuration: {str(e)}")
+            return []
+    else:
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+        except Exception as e:
+            logger.error(f"Error reading MCP configuration: {str(e)}")
+            return []
 
     mcp_servers = config.get("mcpServers", {})
     all_tools: List[MCPAgentTool] = []
