@@ -18,7 +18,7 @@ helm upgrade ${KUBERNETES_APP_WEATHER_AGENT_NAME} helm \
   -f helm/mcp-remote.yaml
 
 # Deploy UI
-
+kubectl create ns ${KUBERNETES_APP_WEATHER_AGENT_UI_NAMESPACE} || true
 kubectl delete secret ${KUBERNETES_APP_WEATHER_AGENT_UI_SECRET_NAME} \
   --namespace ${KUBERNETES_APP_WEATHER_AGENT_UI_NAMESPACE} 2>/dev/null || true
 kubectl create secret generic ${KUBERNETES_APP_WEATHER_AGENT_UI_SECRET_NAME} \
@@ -29,7 +29,6 @@ kubectl create secret generic ${KUBERNETES_APP_WEATHER_AGENT_UI_SECRET_NAME} \
   --from-literal=OAUTH_WELL_KNOWN_URL=${OAUTH_WELL_KNOWN_URL} \
   --from-literal=OAUTH_JWKS_URL=${OAUTH_JWKS_URL} \
   --namespace ${KUBERNETES_APP_WEATHER_AGENT_UI_NAMESPACE}
-
 helm upgrade ${KUBERNETES_APP_WEATHER_AGENT_UI_NAME} web/helm \
   --install \
   --namespace ${KUBERNETES_APP_WEATHER_AGENT_UI_NAMESPACE} \
