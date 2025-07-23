@@ -110,12 +110,12 @@ uv run agent
 
 Build the container using Docker:
 ```bash
-docker build --platform . --tag agent
+docker build . --tag agent
 ```
 
 Build the container using Finch:
 ```bash
-finch build --platform . --tag agent
+finch build . --tag agent
 ```
 
 ### Running Containers
