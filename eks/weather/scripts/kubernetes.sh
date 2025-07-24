@@ -17,8 +17,8 @@ helm upgrade ${KUBERNETES_APP_WEATHER_AGENT_NAME} helm \
   --namespace ${KUBERNETES_APP_WEATHER_AGENT_NAMESPACE} \
   --create-namespace \
   --set image.repository=${ECR_REPO_WEATHER_AGENT_URI} \
-  --set env.DYNAMODB_AGENT_STATE_TABLE_NAME=${DYNAMODB_AGENT_STATE_TABLE_NAME} \
   --set env.OAUTH_JWKS_URL=${OAUTH_JWKS_URL} \
+  --set env.SESSION_STORE_BUCKET_NAME=${SESSION_STORE_BUCKET_NAME} \
   -f helm/mcp-remote.yaml
 
 # Deploy UI
