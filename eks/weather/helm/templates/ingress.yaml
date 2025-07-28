@@ -1,0 +1,47 @@
+{{- $root := . -}}
+{{- range $i, $ing := .Values.ingresses | default (list) }}
+{{- if $ing.enabled | default true }}
+{{- $name := default (printf "ingress-%d" $i) $ing.name }}
+{{- $svcName := default (include "agent.fullname" $root) ($ing.service.name | default "") }}
+{{- $class := $ing.className | default "" }}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-%s" (include "agent.fullname" $root) $name | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "agent.labels" $root | nindent 4 }}
+  {{- with $ing.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $class }}
+  ingressClassName: {{ $class }}
+  {{- end }}
+  {{- with $ing.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range $ing.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ default "ImplementationSpecific" .pathType }}
+            backend:
+              service:
+                name: {{ $svcName }}
+                port:
+                  {{- if (hasKey $ing.service.port "number") }}
+                  number: {{ $ing.service.port.number }}
+                  {{- else }}
+                  name: {{ $ing.service.port.name }}
+                  {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
