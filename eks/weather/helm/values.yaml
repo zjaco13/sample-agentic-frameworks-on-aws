@@ -51,7 +51,6 @@ agent: |
   - When returning forecasts, always include whether the weather is good for outdoor activities for each day
   - Provide information about weather alerts for US cities when requested
 
-
 imagePullSecrets: []
 
 nameOverride: ""
@@ -100,43 +99,36 @@ tolerations: []
 
 affinity: {}
 
+ingressClass:
+  create: true
+  parameters:
+    create: false
 
 ingresses:
   - name: fastapi
-    enabled: true
-    tls: []
-    hosts:
-      - host: fastapi.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
+    annotations:
+      alb.ingress.kubernetes.io/group.name: weather-agent
+      alb.ingress.kubernetes.io/scheme: internet-facing
+    paths:
+      - path: /
+        pathType: Prefix
     service:
-      port:
-        name: fastapi
-        number: 3000
+      port: { name: fastapi, number: 3000 }
 
   - name: mcp
-    enabled: true
-    tls: []
-    hosts:
-      - host: weather-mcp.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
+    annotations:
+      alb.ingress.kubernetes.io/group.name: weather-agent
+    paths:
+      - path: /mcp
+        pathType: Prefix
     service:
-      port:
-        name: mcp
-        number: 8080
+      port: { name: mcp, number: 8080 }
 
   - name: a2a
-    enabled: true
-    tls: []
-    hosts:
-      - host: a2a.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
+    annotations:
+      alb.ingress.kubernetes.io/group.name: weather-agent
+    paths:
+      - path: /a2a
+        pathType: Prefix
     service:
-      port:
-        name: a2a
-        number: 9000
+      port: { name: a2a, number: 9000 }
