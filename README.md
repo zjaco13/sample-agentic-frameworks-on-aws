@@ -6,7 +6,6 @@
 
 [![Open Issues](https://img.shields.io/github/issues/aws-samples/3P-Agentic-Frameworks)](https://github.com/aws-samples/3P-Agentic-Frameworks/issues)
 [![GitHub stars](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
-[![Github forks](https://img.shields.io/github/stars/aws-samples/3P-Agentic-Frameworks?style=social&label=Star)](https://github.com/aws-samples/3P-Agentic-Frameworks/stargazers)
 
 This repository provides examples and reference architectures for building autonomous agents using popular frameworks on AWS services. These examples demonstrate how to leverage AWS services to create production-ready agent applications for various industry verticals. Examples will cover different layers of the agent stack including foundational models, orchestration, memory, tools, observability and evals, deployment patterns.
 
