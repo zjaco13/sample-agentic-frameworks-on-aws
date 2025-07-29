@@ -2,14 +2,16 @@
 set -euo pipefail
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOTDIR="$(cd ${SCRIPTDIR}/../..; pwd )"
+ROOTDIR="$(cd ${SCRIPTDIR}/..; pwd )"
 [[ -n "${DEBUG:-}" ]] && set -x
 [[ -n "${DEBUG:-}" ]] && echo "executing ${BASH_SOURCE[0]} from ${BASH_SOURCE[0]}"
 [[ -n "${DEBUG:-}" ]] && echo "SCRIPTDIR=$SCRIPTDIR"
 [[ -n "${DEBUG:-}" ]] && echo "ROOTDIR=$ROOTDIR"
 
-echo "Login with username: Alice and password: Passw0rd@"
+# Not need it when running in workshop
+#$SCRIPTDIR/infra.sh
+#source $SCRIPTDIR/env.sh
+#$SCRIPTDIR/containers.sh
 
-kubectl  port-forward svc/${KUBERNETES_APP_AGENT_UI_NAME} \
-  --namespace ${KUBERNETES_APP_AGENT_UI_NAMESPACE} \
-  8000:fastapi
+$SCRIPTDIR/kubernetes.sh
+$SCRIPTDIR/ui.sh

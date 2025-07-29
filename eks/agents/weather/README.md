@@ -1,6 +1,46 @@
-# AI Agents on EKS
+# Weather Agent Overview
+
+This implementation provides a weather-focused AI agent that processes natural language requests for weather information and alerts.
 
 A generic AI agent framework built with Strands Agents, MCP (Model Context Protocol), A2A (Agent to Agent), and FastAPI. Configurable for any domain including weather forecasts, financial analysis, customer service, and more.
+
+### Agent Capabilities
+- Current weather conditions
+- Weather forecasts
+- Weather alerts
+- Temperature information
+- Weather-related recommendations
+
+### Example Interactions
+
+Input Prompt:
+```
+What's the weather like in San Francisco?
+```
+
+Expected Response Format:
+```
+As the Weather Agent, I've checked the current conditions for San Francisco:
+
+Current Weather:
+- Temperature: 62°F
+- Conditions: Partly Cloudy
+- Humidity: 75%
+- Wind: 12 mph from the West
+
+Today's Forecast:
+- High: 68°F
+- Low: 54°F
+- Conditions: Morning fog clearing to partly cloudy
+- Precipitation Chance: 10%
+
+Notable Conditions:
+- Morning fog expected until 11 AM
+- Clear conditions in the afternoon
+- Light breeze throughout the day
+```
+
+
 
 ## Example
 
@@ -36,7 +76,7 @@ graph TB
                 UI_POD[Agent UI<br/>FastAPI:8000<br/>OAuth Auth]
             end
 
-            subgraph "weather-agent namespace"
+            subgraph "agents namespace"
                 AGENT_POD[Weather Agent<br/>MCP:8080 A2A:9000 REST:3000]
             end
 
@@ -101,6 +141,11 @@ This is how an Agent gets created:
 
 ### 1. Environment Setup
 
+Run all commands from the `agents/weather/` directory
+```bash
+cd agents/weather/
+```
+
 Set up the required environment variables:
 
 ```bash
@@ -115,10 +160,10 @@ export CLUSTER_NAME=agentic-ai-on-eks
 export KUBERNETES_APP_WEATHER_MCP_NAMESPACE=mcp-servers
 export KUBERNETES_APP_WEATHER_MCP_NAME=weather-mcp
 
-export KUBERNETES_APP_WEATHER_AGENT_NAMESPACE=weather-agent
+export KUBERNETES_APP_WEATHER_AGENT_NAMESPACE=agents
 export KUBERNETES_APP_WEATHER_AGENT_NAME=weather-agent
 
-export KUBERNETES_APP_AGENT_UI_NAMESPACE=agent-ui
+export KUBERNETES_APP_AGENT_UI_NAMESPACE=ui
 export KUBERNETES_APP_AGENT_UI_NAME=agent-ui
 export KUBERNETES_APP_AGENT_UI_SECRET_NAME=agent-ui
 
@@ -145,11 +190,11 @@ export BEDROCK_MODEL_ID=us.anthropic.claude-3-7-sonnet-20250219-v1:0
 Deploy the infrastructure using Terraform:
 
 ```bash
-cd ../terraform
+cd ../../infrastructure/terraform/
 terraform init
 terraform apply
-./prep-env-weather-agent.sh
-./prep-env-weather-ui.sh
+../../scripts/terraform-prep-env-weather-agent.sh
+../../scripts/terraform-prep-env-weather-agent.sh
 cd -
 ```
 
@@ -177,7 +222,7 @@ docker build --platform linux/amd64 -t ${ECR_REPO_WEATHER_AGENT_URI}:latest .
 docker push ${ECR_REPO_WEATHER_AGENT_URI}:latest
 
 # Build and push Agent UI
-docker build --platform linux/amd64 -t ${ECR_REPO_AGENT_UI_URI}:latest web
+docker build --platform linux/amd64 -t ${ECR_REPO_AGENT_UI_URI}:latest ../../ui
 docker push ${ECR_REPO_AGENT_UI_URI}:latest
 ```
 
@@ -193,11 +238,11 @@ aws eks update-kubeconfig --name ${CLUSTER_NAME} --region ${AWS_REGION}
 Deploy the MCP Server:
 ```bash
 # Deploy the MCP Server
-helm upgrade ${KUBERNETES_APP_WEATHER_MCP_NAME} mcp-servers/weather-mcp-server/helm \
+helm upgrade ${KUBERNETES_APP_WEATHER_MCP_NAME} ../../manifests/helm/mcp \
   --install \
   --namespace ${KUBERNETES_APP_WEATHER_MCP_NAMESPACE} \
   --create-namespace \
-  -f mcp-servers/weather-mcp-server/helm/workshop-mcp-weather-values.yaml
+  -f ../../manifests/helm/mcp/workshop-mcp-weather-values.yaml
 
 # Wait for MCP server to be ready
 kubectl rollout status deployment ${KUBERNETES_APP_WEATHER_MCP_NAME} \
@@ -207,11 +252,11 @@ kubectl rollout status deployment ${KUBERNETES_APP_WEATHER_MCP_NAME} \
 Deploy the Agent Service:
 ```bash
 # Deploy the Agent
-helm upgrade ${KUBERNETES_APP_WEATHER_AGENT_NAME} helm \
+helm upgrade ${KUBERNETES_APP_WEATHER_AGENT_NAME} ../../manifests/helm/agent \
   --install \
   --namespace ${KUBERNETES_APP_WEATHER_AGENT_NAMESPACE} \
   --create-namespace \
-  -f helm/workshop-agent-weather-values.yaml
+  -f ../../manifests/helm/agent/workshop-agent-weather-values.yaml
 
 # Wait for Agent to be ready
 kubectl rollout status deployment ${KUBERNETES_APP_WEATHER_AGENT_NAME} \
@@ -226,14 +271,14 @@ kubectl delete secret ${KUBERNETES_APP_AGENT_UI_SECRET_NAME} \
   --namespace ${KUBERNETES_APP_AGENT_UI_NAMESPACE} 2>/dev/null || true
 kubectl create secret generic ${KUBERNETES_APP_AGENT_UI_SECRET_NAME} \
   --namespace ${KUBERNETES_APP_AGENT_UI_NAMESPACE} \
-  --from-env-file web/.env
+  --from-env-file ../../ui/.env
 
 # Deploy the Agent UI
-helm upgrade ${KUBERNETES_APP_AGENT_UI_NAME} web/helm \
+helm upgrade ${KUBERNETES_APP_AGENT_UI_NAME} ../../manifests/helm/ui \
   --install \
   --namespace ${KUBERNETES_APP_AGENT_UI_NAMESPACE} \
   --create-namespace \
-  -f web/helm/workshop-ui-values.yaml
+  -f ../../manifests/helm/ui/workshop-ui-values.yaml
 
 
 # Wait for Agent UI to be ready
@@ -246,8 +291,8 @@ Review the 3 pods running (MCP, Agent, UI) or go to [AWS EKS Console Resource vi
 Or check in the terminal
 ```bash
 kubectl get pods -n mcp-servers
-kubectl get pods -n weather-agent
-kubectl get pods -n agent-ui
+kubectl get pods -n agents
+kubectl get pods -n ui
 ```
 Expected output should look like this, all pods in `Running` status:
 ```
@@ -263,19 +308,15 @@ agent-ui-6f4c6d889-r442z        1/1     Running   0          44s
 
 ### 5. Access the Weather Agent UI
 
-Before runnign `kubectl port-forward` lets get some values
+The included UI provides:
+- OAuth authentication via Amazon Cognito
+- Multi-agent chat interface
+- Session management
+- Responsive design for mobile and desktop
 
-If running this lab from a workshop environment get the Agent url with this command:
-```bash
-echo "$IDE_URL/proxy/8000/"
-```
-Or if running locally on your on your developer computer then use this url http://localhost:8000/chat/
-
-Print the username and password
-```bash
-echo "Username: Alice"
-echp "Password: Passw0rd@"
-```
+Access the UI after deployment at the configured endpoint with default credentials:
+- Username: `Alice`
+- Password: `Passw0rd@`
 
 Run Kubectl Port forward the Agent UI and access it:
 ```bash
@@ -284,10 +325,32 @@ kubectl  port-forward svc/${KUBERNETES_APP_AGENT_UI_NAME} \
   8000:fastapi
 ```
 
+From another terminal open the Browser with the corresponding URL
+
+If running this lab from a workshop environment get the Agent url and open with this command:
+```bash
+python3 -m webbrowser "$IDE_URL/proxy/8000/"
+```
+If you not in workshop studio and instead running locally on your on your developer computer then use localhost
+```bash
+python3 -m webbrowser "http://localhost:8000/chat/"
+```
+
+
+Say hello to the weather to see what how the Agent can help you, hit enter to send the prompt to the Agent.
+```bash
+Hello
+```
+
+![weather agent ui hello](../../images/agents-ui-weather-hello.png)
+
 Ask the agent the following question:
 ```prompt
 What's the weather like in San Francisco?
 ```
+
+![weather agent ui forecast](../../images/agents-ui-weather-forecast.png)
+
 
 Check the agent logs in different terminal
 ```bash
@@ -296,14 +359,17 @@ kubectl logs -n ${KUBERNETES_APP_WEATHER_AGENT_NAMESPACE} deploy/${KUBERNETES_AP
 
 Ask another question about alerts (a different tool), without specifying the city or state, the Agent remembers the state location from the first message.
 ```prompt
-Any weather alerts?
+Any weather alerts for this state?
 ```
+
+![weather agent ui alerts](../../images/agents-ui-weather-alerts.png)
+
 
 ## Agent Configuration
 
-The weather agent's behavior is defined in the `agent.md` file when running locally with `uv run` and in the helm values file [helm/values.yaml](helm/values.yaml) when running in EKS.
+The weather agent's behavior is defined in the `agent.md` file when running locally with `uv run` and in the helm values file [../../manifests/helm/agent/values.yaml](../../manifests/helm/agent/values.yaml) when running in EKS.
 
-The tools for the agent are defined in mcp.json in the helm values file [helm/mcp-remote.yaml](helm/mcp-remote.yaml) to use remote mcp servers, by the default it will use the embedded mcp server enabled in the default [helm/values.yaml](helm/values.yaml) file.
+The tools for the agent are defined in mcp.json in the helm values file [../../manifests/helm/agent/mcp-remote.yaml](../../manifests/helm/agent/mcp-remote.yaml) to use remote mcp servers, by the default it will use the embedded mcp server enabled in the default [../../manifests/helm/agent/values.yaml](../../manifests/helm/agent/values.yaml) file.
 
 The configuration includes:
 - **Agent Name**: Display name for the agent
@@ -326,8 +392,9 @@ helm uninstall ${KUBERNETES_APP_WEATHER_MCP_NAME} \
 
 Delete EKS cluster (via Terraform)
 ```bash
-cd ../terraform
+cd ../../infrastructure/terraform/
 terraform destroy
+cd -
 ```
 
 ## Next Steps

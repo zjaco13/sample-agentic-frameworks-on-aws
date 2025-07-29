@@ -4,17 +4,15 @@
 #set -euo pipefail
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOTDIR="$(cd ${SCRIPTDIR}/../..; pwd )"
+ROOTDIR="$(cd ${SCRIPTDIR}/..; pwd )"
 [[ -n "${DEBUG:-}" ]] && set -x
 [[ -n "${DEBUG:-}" ]] && echo "executing ${BASH_SOURCE[0]} from ${BASH_SOURCE[0]}"
 [[ -n "${DEBUG:-}" ]] && echo "SCRIPTDIR=$SCRIPTDIR"
 [[ -n "${DEBUG:-}" ]] && echo "ROOTDIR=$ROOTDIR"
 
-export TERRAFORM_DIRECTORY="terraform"
-
 # Setup the .env, and web/.env, and workshop-values.yaml
-$ROOTDIR/$TERRAFORM_DIRECTORY/prep-env-weather-agent.sh
-$ROOTDIR/$TERRAFORM_DIRECTORY/prep-env-weather-ui.sh
+$SCRIPTDIR/terraform-prep-env-weather-agent.sh
+$SCRIPTDIR/terraform-prep-env-weather-ui.sh
 
 # AWS Configuration
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
@@ -27,10 +25,10 @@ export CLUSTER_NAME=${CLUSTER_NAME:-agentic-ai-on-eks}
 export KUBERNETES_APP_WEATHER_MCP_NAMESPACE=mcp-servers
 export KUBERNETES_APP_WEATHER_MCP_NAME=weather-mcp
 
-export KUBERNETES_APP_WEATHER_AGENT_NAMESPACE=weather-agent
+export KUBERNETES_APP_WEATHER_AGENT_NAMESPACE=agents
 export KUBERNETES_APP_WEATHER_AGENT_NAME=weather-agent
 
-export KUBERNETES_APP_AGENT_UI_NAMESPACE=agent-ui
+export KUBERNETES_APP_AGENT_UI_NAMESPACE=ui
 export KUBERNETES_APP_AGENT_UI_NAME=agent-ui
 export KUBERNETES_APP_AGENT_UI_SECRET_NAME=agent-ui
 
@@ -49,18 +47,27 @@ export ECR_REPO_AGENT_UI_URI=${ECR_REPO_HOST}/${ECR_REPO_AGENT_UI_NAME}
 # Amazon Bedrock Configuration
 export BEDROCK_MODEL_ID=us.anthropic.claude-3-7-sonnet-20250219-v1:0
 
+
+# Helm Charts
+export MCP_HELM_CHART="${ROOTDIR}/manifests/helm/mcp"
+export AGENT_HELM_CHART="${ROOTDIR}/manifests/helm/agent"
+export UI_AGENT_HELM_CHART="${ROOTDIR}/manifests/helm/ui"
+
+# UI
+export UI_AGENT_DIRECTORY="${ROOTDIR}/ui"
+export UI_AGENT_HELM_VALUES="${UI_AGENT_HELM_CHART}/workshop-ui-values.yaml"
+
 # Agents
-export MCP_HELM_CHART="${ROOTDIR}/weather/mcp-servers/weather-mcp-server/helm"
-export WEATHER_MCP_VALUES="${MCP_HELM_CHART}/workshop-mcp-weather-values.yaml"
-
-export SINGLE_AGENT_DIRECTORY="${ROOTDIR}/weather"
-export AGENT_HELM_CHART="${ROOTDIR}/weather/helm"
-
+export WEATHER_AGENT_DIRECTORY="${ROOTDIR}/agents/weather"
 export WEATHER_AGENT_HELM_VALUES="${AGENT_HELM_CHART}/workshop-agent-weather-values.yaml"
 
-export UI_AGENT_DIRECTORY="${ROOTDIR}/weather/web"
-export UI_AGENT_HELM_CHART="${ROOTDIR}/weather/web/helm"
-export UI_AGENT_HELM_VALUES="${UI_AGENT_HELM_CHART}/workshop-ui-values.yaml"
+# MCP Servers
+# TODO: move all mcp servers to the root under ${ROOTDIR}/mcp-servers
+export WEATHER_MCP_DIRECTORY="${ROOTDIR}/agents/weather/mcp-servers/weather-mcp-server"
+export WEATHER_MCP_VALUES="${MCP_HELM_CHART}/workshop-mcp-weather-values.yaml"
+
+
+
 
 
 
