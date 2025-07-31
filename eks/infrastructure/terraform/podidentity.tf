@@ -49,7 +49,7 @@ module "travel_agent_pod_identity" {
   version = "~> 1.0"
 
   ## IAM role / policy
-  name                 = "${local.name}-travel-agent-bedrock-role"
+  name                 = "${local.name}-bedrock-role-ta"
   attach_custom_policy = true
   policy_statements = [
     {
