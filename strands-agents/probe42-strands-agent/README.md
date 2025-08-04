@@ -68,11 +68,6 @@ Show me comprehensive KYC data for L65923DL1982PLC013915
 What's the Probe Score and director information for U72900KA2001PTC028925?
 ```
 
-### Combined Queries
-```
-Search for "Probe" companies, then get base and KYC details for the first result
-```
-
 ## Architecture
 
 Built using the Strands Agent SDK:
