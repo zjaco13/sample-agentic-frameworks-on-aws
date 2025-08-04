@@ -29,3 +29,27 @@ output "configure_kubectl" {
   description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig"
   value       = "aws eks --region ${local.region} update-kubeconfig --name ${module.eks.cluster_name}"
 }
+
+module "eks_blueprints_addons" {
+  source  = "aws-ia/eks-blueprints-addons/aws"
+  version = "~> 1.16"
+
+  cluster_name      = module.eks.cluster_name
+  cluster_endpoint  = module.eks.cluster_endpoint
+  cluster_version   = module.eks.cluster_version
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  # EKS Add-on
+  eks_addons = {
+    adot               = {}
+    aws-ebs-csi-driver = {}
+  }
+
+  # Add-ons
+  enable_cert_manager = true
+
+
+  tags = local.tags
+
+  depends_on = [module.eks]
+}
