@@ -2,6 +2,10 @@
 
 A Strands Agent implementation for accessing Probe42 API to search and analyze Indian corporate entities.
 
+[Probe API Portal](https://apiportal.probe42.in/#/portal/explore-api)
+
+**Note**: Probe42 API has pricing. Check their documentation for current rates.
+
 ## Features
 
 - `search_entities`: Search within the database of all Indian corporates by name
@@ -74,8 +78,6 @@ Built using the Strands Agent SDK:
 - **Tools**: Python functions decorated with `@tool` for automatic schema generation
 - **Agent**: Strands Agent with system prompt and tool integration
 - **API Client**: Async HTTP client using httpx for Probe42 API calls
-
-**Note**: Probe42 API has pricing. Check their documentation for current rates.
 
 ## License
 
