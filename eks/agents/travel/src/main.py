@@ -73,7 +73,7 @@ def server():
         # Start FastAPI server
         logger.info("Starting FastAPI Server...")
         fastapi_process = subprocess.Popen([
-            "uv", "run", "fastapi-server"
+            "fastapi-server"
         ])
         processes.append(("FastAPI Server", fastapi_process))
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-ROOTDIR="$(cd ${SCRIPTDIR}/..; pwd )"
+SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOTDIR="$(
+  cd ${SCRIPTDIR}/..
+  pwd
+)"
 [[ -n "${DEBUG:-}" ]] && set -x
 [[ -n "${DEBUG:-}" ]] && echo "executing ${BASH_SOURCE[0]} from ${BASH_SOURCE[0]}"
 [[ -n "${DEBUG:-}" ]] && echo "SCRIPTDIR=$SCRIPTDIR"
@@ -16,23 +19,20 @@ TRAVEL_AGENT_HELM_VALUES="${AGENT_HELM_CHART}/workshop-agent-travel-values.yaml"
 TRAVEL_AGENT_DIRECTORY="${ROOTDIR}/agents/travel"
 TRAVEL_AGENT_DST_FILE_NAME="${TRAVEL_AGENT_DIRECTORY}/.env"
 
-
-
 TERRAFORM_OUTPUTS_MAP=$(terraform -chdir=$TERRAFORM_DIRECTORY output --json outputs_map)
 
 OAUTH_JWKS_URL=$(echo "$TERRAFORM_OUTPUTS_MAP" | jq -r ".cognito_jwks_url")
 BEDROCK_MODEL_ID=$(terraform -chdir=$TERRAFORM_DIRECTORY output -json bedrock_model_id)
 SESSION_STORE_BUCKET_NAME=$(terraform -chdir=$TERRAFORM_DIRECTORY output -json travel_agent_session_store_bucket_name)
 
-echo "" > $TRAVEL_AGENT_DST_FILE_NAME
-echo "OAUTH_JWKS_URL=\"$OAUTH_JWKS_URL\"" >> $TRAVEL_AGENT_DST_FILE_NAME
-echo "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" >> $TRAVEL_AGENT_DST_FILE_NAME
-echo "SESSION_STORE_BUCKET_NAME=$SESSION_STORE_BUCKET_NAME" >> $TRAVEL_AGENT_DST_FILE_NAME
-
+echo "" >$TRAVEL_AGENT_DST_FILE_NAME
+echo "OAUTH_JWKS_URL=\"$OAUTH_JWKS_URL\"" >>$TRAVEL_AGENT_DST_FILE_NAME
+echo "BEDROCK_MODEL_ID=$BEDROCK_MODEL_ID" >>$TRAVEL_AGENT_DST_FILE_NAME
+echo "SESSION_STORE_BUCKET_NAME=$SESSION_STORE_BUCKET_NAME" >>$TRAVEL_AGENT_DST_FILE_NAME
 
 ECR_REPO_TRAVEL_AGENT_URI=$(terraform -chdir=$TERRAFORM_DIRECTORY output -json ecr_travel_agent_repository_url)
 
-cat <<EOF > $TRAVEL_AGENT_HELM_VALUES
+cat <<EOF >$TRAVEL_AGENT_HELM_VALUES
 agent:
   agent.md: |
     # Travel Assistant Agent Configuration
@@ -144,9 +144,12 @@ a2a:
   a2a_agents.json: |
     {
       "urls": [
-        "http://weather-agent.weather-agent:9000/"
+        "http://weather-agent:9000/"
       ]
     }
+
+serviceAccount:
+  name: travel-agent
 
 image:
   repository: $ECR_REPO_TRAVEL_AGENT_URI

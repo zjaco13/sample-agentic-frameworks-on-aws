@@ -8,13 +8,22 @@ dependencies = [
     "a2a-sdk>=0.2.14",
     "boto3>=1.39.9",
     "strands-agents-tools[a2a-client]>=0.2.2",
-    "strands-agents[a2a]>=1.1.0"
+    "strands-agents[a2a]>=1.3.0",
+    "markdown>=3.8.2",
+    "rich>=14.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "aiohttp>=3.8.0",
+    "requests>=2.31.0",
+    "pyjwt==2.10.1",
+    "cryptography==45.0.4",
+    "python-dotenv==1.0.1"
 ]
 
 [project.scripts]
 "fastapi-server"   = "src.main:main_fastapi"
 "interactive"      = "src.main:main_interactive"
-"agent"            = "src.main:servers"
+"agent"            = "src.main:server"
 
 [build-system]
 requires = ["hatchling"]
