@@ -1,0 +1,6 @@
+langgraph
+langchain-core
+langchain-community
+langchain-aws
+tavily-python
+wikipedia
