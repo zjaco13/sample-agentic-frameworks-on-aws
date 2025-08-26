@@ -14,6 +14,7 @@ The application follows a serverless-first architecture deployed on AWS:
 - [Testing Agents Logic](#testing-agents-logic)
 - [Service Quota](#service-quota-for-api-gateway-integration)
 - [Solutions Adoption](#solution-adoption)
+- [Clean Up](#clean-up)
 
 ## Installation
 
@@ -101,6 +102,8 @@ make deploy-portfolio-manager
 ---
 
 To destroy any module, run the following commands:
+
+#### Note: Use these destroy steps to also help with cleaning up resources
 
 ```bash
 # Destroy agents first
@@ -346,3 +349,7 @@ However, if you plan to process extensive user profile data, handle complex mult
 ### Solution Adoption
 
 Organizations adopting this solution should establish proper security protocols including but not limited to guardrails, unit testing, integration testing, and encryption. Adopters must follow engineering best practices and implement secure LLM training practices with their own domain-specific data to ensure relevancy and accuracy.
+
+### Clean Up
+
+To clean up, make sure that you have deleted all the resources by running `make destroy-{resource}` commands. Refer to [the clean up steps](#note-use-these-destroy-steps-to-also-help-with-cleaning-up-resources) above for details. 
