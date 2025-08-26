@@ -23,6 +23,7 @@ This project serves as a reference implementation demonstrating how to design an
   - [Using the CLI](docs/main/solution_deployment.md#using-the-cli)
   - [Testing Agents Logic](docs/main/solution_deployment.md#testing-agents-logic)
   - [Service Quota for API Gateway Integration](docs/main/solution_deployment.md#service-quota-for-api-gateway-integration)
+  - [Clean Up](docs/main/solution_deployment.md#clean-up)
 - [Developer Guide](docs/main/development_guide.md)
   - [Development Prerequisites](docs/main/development_guide.md#installation)
   - [Local Environment Setup](docs/main/development_guide.md#local-setup-pre-requisite)
@@ -149,7 +150,7 @@ a2a-advisory-trading/
 │ │ ├── layers/
 │ │ │ ├── layer.tf                        # Lambda layer for dependencies in deployed environment
 │ │ │ ├── outputs.tf                        
-│ │ │ ├── variables.tf                                
+│ │ │ └── variables.tf                                
 │ │ ├── market_analysis/
 │ │ │ ├── main/                           # Market Analysis agent core logic
 │ │ │ │ ├── handler.py
