@@ -1,0 +1,6 @@
+# Core dependencies for Bedrock AgentCore with Strands
+strands-agents
+strands-agents-tools
+bedrock-agentcore
+bedrock-agentcore-starter-toolkit
+pandas
