@@ -1,0 +1,1 @@
+arn:aws:iam::393632813077:role/bedrock_agentcore_role
