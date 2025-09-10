@@ -56,7 +56,8 @@ module "eks_blueprints_addons" {
   }
 
   # Add-ons
-  enable_cert_manager = true
+  enable_cert_manager  = true
+  enable_ingress_nginx = true
 
 
   tags = local.tags

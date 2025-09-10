@@ -48,9 +48,17 @@ cat <<EOF > $UI_AGENT_HELM_VALUES
 image:
   repository: $ECR_REPO_AGENT_UI_URI
 env:
-env:
   AGENT_UI_ENDPOINT_URL_1: "http://weather-agent.agents/prompt"
   AGENT_UI_ENDPOINT_URL_2: "http://travel-agent.agents/prompt"
   BASE_PATH: "${IDE_URL:+/proxy/8000}"
   BASE_URL: "${IDE_URL:-http://localhost:8000}"
+fastapi:
+  ingress:
+    enabled: true
+
+ingress:
+  enabled: true
+  className: nginx
+  defaultRule:
+    enabled: true
 EOF
