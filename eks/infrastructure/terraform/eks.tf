@@ -59,6 +59,10 @@ module "eks_blueprints_addons" {
   enable_cert_manager  = true
   enable_ingress_nginx = true
 
+  ingress_nginx = {
+    values = [templatefile("${path.module}/ingress_nginx_values.yaml", {}),]
+  }
+
 
   tags = local.tags
 
