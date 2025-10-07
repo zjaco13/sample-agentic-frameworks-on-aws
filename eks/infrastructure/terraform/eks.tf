@@ -119,7 +119,7 @@ module "bedrock_logging_role" {
         {
           test     = "ArnLike"
           variable = "aws:SourceArn"
-          values   = ["arn:aws:bedrock:${local.region}:${data.aws_caller_identity.current.account_id}:*"]
+          values   = ["arn:aws:bedrock:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:*"]
         }
       ]
     }
