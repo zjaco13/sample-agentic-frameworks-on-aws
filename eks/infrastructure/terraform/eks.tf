@@ -7,7 +7,7 @@ module "eks" {
   version = "~> 21.0"
 
   name               = var.name
-  kubernetes_version = "1.34"
+  kubernetes_version = "1.33"
 
   iam_role_use_name_prefix = false
   iam_role_name            = "${local.name}-eks-cluster-role"
@@ -51,7 +51,7 @@ module "eks_blueprints_addons" {
 
   # EKS Add-on
   eks_addons = {
-    # adot                            = {} Not supported on 1.34
+    adot                            = {}
     amazon-cloudwatch-observability = {}
   }
 
