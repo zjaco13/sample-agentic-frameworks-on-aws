@@ -51,7 +51,7 @@ module "eks_blueprints_addons" {
 
   # EKS Add-on
   eks_addons = {
-    adot                            = {}
+    # adot                            = {} Not supported on 1.34
     amazon-cloudwatch-observability = {}
   }
 
