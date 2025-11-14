@@ -1,13 +1,35 @@
-## LangGraph
-![3p-agentic-frameworks](assets/langgraph-aws.png)
+## LangChain
+![3p-agentic-frameworks](assets/langchain-aws.png)
 
-LangGraph is a low-level orchestration framework for building controllable agents. While langchain provides integrations and composable components to streamline LLM application development, the LangGraph library enables agent orchestration — offering customizable architectures, long-term memory, and human-in-the-loop to reliably handle complex tasks.
+LangChain is the easiest way to start building agents and applications powered by LLMs. With under 10 lines of code, you can connect to models from Amazon Bedrock, Sagemaker, OpenAI, Anthropic, Google and more.
 
-## LangGraph Official Documentation
+We recommend you use LangChain if you want to quickly build agents and autonomous applications. Use LangGraph, our low-level agent orchestration framework and runtime, when you have more advanced needs that require a combination of deterministic and agentic workflows, heavy customization, and carefully controlled latency.
 
-**Docs:** https://langchain-ai.github.io/langgraph/tutorials/introduction/
+## LangChain & LangGraph Official Documentation
 
-## LangGraph + AWS
+**Docs:** https://docs.langchain.com/oss/python/langchain/overview
+
+## LangChain + AWS
+
+**Docs for LangChain and AWS Integrations:** https://docs.langchain.com/oss/python/integrations/providers/aws
+
+LangChain supports a rich ecosystem AWS integrations for services such as :
+* Amazon Bedrock
+* Amazon Bedrock Knowledge Bases
+* Amazon Sagemaker
+* Amazon S3
+* Amazon Textract
+* Amazon Athena
+* AWS Glue
+* Amazon OpenSearch Servie
+* Amazon DocumentDB
+* Amazon MemoryDB
+* Amazon Kendra
+* Amazon Lambda
+* Amazon Neptune
+* Amazon Comprehend
+
+Please contact partnerships@langchain.dev for more integration support! 
 
 ### Importing LLMs from Amazon Bedrock
 
