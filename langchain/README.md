@@ -21,7 +21,7 @@ LangChain supports a rich ecosystem AWS integrations for services such as :
 * Amazon Textract
 * Amazon Athena
 * AWS Glue
-* Amazon OpenSearch Servie
+* Amazon OpenSearch Service
 * Amazon DocumentDB
 * Amazon MemoryDB
 * Amazon Kendra
