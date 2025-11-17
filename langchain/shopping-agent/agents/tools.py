@@ -4,8 +4,229 @@ from agents.utils import db
 # ------------------------------------------------------------
 # Opensearch E-commerce Agent Tools
 # ------------------------------------------------------------
+import os
+from agents.opensearch_client import get_opensearch_client
 
-# TODO: Add Opensearch MCP tools
+@tool
+def search_products_by_query(runtime: ToolRuntime, query: str, max_results: int = 10) -> list[dict]:
+    """
+    Search the product catalog using semantic/neural search via OpenSearch.
+    Returns product details matching the customer's query using AI-powered semantic understanding.
+
+    Args:
+        query: Natural language search query (e.g., "comfortable hiking backpack")
+        max_results: Maximum number of products to return (default: 10)
+
+    Returns:
+        list[dict]: List of matching products with relevance scores
+    """
+    client = get_opensearch_client()
+    model_id = os.getenv('OPENSEARCH_MODEL_ID')
+    index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
+
+    # Perform neural search using the deployed ML model
+    search_body = {
+        "size": max_results,
+        "query": {
+            "neural": {
+                "product_vector": {
+                    "query_text": query,
+                    "model_id": model_id,
+                    "k": max_results * 2  # Get more candidates for better ranking
+                }
+            }
+        },
+        "_source": {
+            "excludes": ["product_vector"]  # Don't return the vector in results
+        }
+    }
+
+    try:
+        response = client.search(index=index_name, body=search_body)
+
+        products = []
+        for hit in response['hits']['hits']:
+            product = hit['_source']
+            product['relevance_score'] = round(hit['_score'], 2)
+            products.append(product)
+
+        return products
+    except Exception as e:
+        return [{"error": f"Search failed: {str(e)}"}]
+
+
+@tool
+def filter_products_by_category_and_price(
+    runtime: ToolRuntime,
+    category: str = None,
+    min_price: float = 0,
+    max_price: float = 10000,
+    promoted_only: bool = False,
+    max_results: int = 20
+) -> list[dict]:
+    """
+    Filter and browse products by category, price range, and promotion status.
+    Use this for structured browsing when customers want to see products in a specific category or price range.
+
+    Args:
+        category: Product category to filter by (e.g., "accessories", "electronics", "apparel")
+        min_price: Minimum price in dollars (default: 0)
+        max_price: Maximum price in dollars (default: 10000)
+        promoted_only: Only return promoted/featured products (default: False)
+        max_results: Maximum number of products to return (default: 20)
+
+    Returns:
+        list[dict]: List of products matching the filters
+    """
+    client = get_opensearch_client()
+    index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
+
+    # Build filter query
+    filters = []
+
+    if category:
+        filters.append({"term": {"category": category.lower()}})
+
+    filters.append({"range": {"price": {"gte": min_price, "lte": max_price}}})
+    filters.append({"range": {"current_stock": {"gt": 0}}})  # Only in-stock items
+
+    if promoted_only:
+        filters.append({"term": {"promoted": True}})
+
+    search_body = {
+        "size": max_results,
+        "query": {
+            "bool": {
+                "filter": filters
+            }
+        },
+        "sort": [
+            {"promoted": {"order": "desc"}},  # Promoted items first
+            {"price": {"order": "asc"}}       # Then by price ascending
+        ],
+        "_source": {
+            "excludes": ["product_vector"]
+        }
+    }
+
+    try:
+        response = client.search(index=index_name, body=search_body)
+
+        products = []
+        for hit in response['hits']['hits']:
+            products.append(hit['_source'])
+
+        return products
+    except Exception as e:
+        return [{"error": f"Filter failed: {str(e)}"}]
+
+
+@tool
+def get_product_recommendations(runtime: ToolRuntime, max_results: int = 5) -> list[dict]:
+    """
+    Get personalized product recommendations based on customer's preferences from their memory profile.
+    Uses hybrid search combining neural semantic search with keyword matching for best results.
+
+    Args:
+        max_results: Maximum number of recommendations (default: 5)
+
+    Returns:
+        list[dict]: List of recommended products with relevance scores
+    """
+    loaded_memory = runtime.state.get("loaded_memory", "")
+
+    client = get_opensearch_client()
+    model_id = os.getenv('OPENSEARCH_MODEL_ID')
+    index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
+
+    # If no preferences, return promoted products
+    if not loaded_memory or loaded_memory.strip() == "":
+        return filter_products_by_category_and_price.invoke(
+            {"runtime": runtime, "promoted_only": True, "max_results": max_results}
+        )
+
+    # Hybrid search: Neural + BM25 for better relevance
+    search_body = {
+        "size": max_results,
+        "query": {
+            "bool": {
+                "should": [
+                    {
+                        "neural": {
+                            "product_vector": {
+                                "query_text": loaded_memory,
+                                "model_id": model_id,
+                                "k": max_results * 3
+                            }
+                        }
+                    },
+                    {
+                        "multi_match": {
+                            "query": loaded_memory,
+                            "fields": ["name^2", "description", "category"],
+                            "type": "best_fields",
+                            "boost": 0.5  # Neural search gets more weight
+                        }
+                    }
+                ],
+                "filter": [
+                    {"range": {"current_stock": {"gt": 0}}}
+                ],
+                "minimum_should_match": 1
+            }
+        },
+        "_source": {
+            "excludes": ["product_vector"]
+        }
+    }
+
+    try:
+        response = client.search(index=index_name, body=search_body)
+
+        products = []
+        for hit in response['hits']['hits']:
+            product = hit['_source']
+            product['relevance_score'] = round(hit['_score'], 2)
+            products.append(product)
+
+        return products
+    except Exception as e:
+        return [{"error": f"Recommendations failed: {str(e)}"}]
+
+
+@tool
+def get_product_by_id(runtime: ToolRuntime, product_id: str) -> dict:
+    """
+    Get detailed information about a specific product by its ID.
+    Use this when you need to look up a specific product that was mentioned or referenced.
+
+    Args:
+        product_id: The unique product identifier
+
+    Returns:
+        dict: Product details or error message
+    """
+    client = get_opensearch_client()
+    index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
+
+    try:
+        response = client.get(
+            index=index_name,
+            id=product_id,
+            _source_excludes=["product_vector"]
+        )
+        return response['_source']
+    except Exception as e:
+        return {"error": f"Product {product_id} not found: {str(e)}"}
+
+
+# Export OpenSearch tools
+opensearch_tools = [
+    search_products_by_query,
+    filter_products_by_category_and_price,
+    get_product_recommendations,
+    get_product_by_id
+]
 
 # ------------------------------------------------------------
 # Invoice Subagent Tools
