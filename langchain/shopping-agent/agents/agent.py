@@ -8,7 +8,6 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import AnyMessage, add_messages
 from langgraph.managed.is_last_step import RemainingSteps
 from langgraph.store.base import BaseStore
-from langgraph.store.memory import InMemoryStore
 from langgraph.types import interrupt
 
 from agents.subagents import invoice_subagent, opensearch_subagent
@@ -221,7 +220,7 @@ workflow_builder.add_edge("opensearch_agent", "create_memory")
 workflow_builder.add_edge("invoice_agent", "create_memory")
 workflow_builder.add_edge("create_memory", END)
 
-# Create in-memory store for customer preferences/memory
-memory_store = InMemoryStore()
-
-graph = workflow_builder.compile(name="multi_agent_verify", store=memory_store)
+# Compile the graph
+# LangGraph API (dev or cloud) provides managed persistence automatically.
+# Do not use a custom store - the platform handles it.
+graph = workflow_builder.compile(name="multi_agent_verify")
