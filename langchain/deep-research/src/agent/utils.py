@@ -43,7 +43,7 @@ TAVILY_SEARCH_DESCRIPTION = (
 @tool(description=TAVILY_SEARCH_DESCRIPTION)
 async def tavily_search(
     queries: List[str],
-    max_results: Annotated[int, InjectedToolArg] = 5,
+    max_results: Annotated[int, InjectedToolArg] = 2,
     topic: Annotated[Literal["general", "news", "finance"], InjectedToolArg] = "general",
     config: RunnableConfig = None
 ) -> str:
@@ -137,7 +137,7 @@ async def tavily_search(
 
 async def tavily_search_async(
     search_queries, 
-    max_results: int = 5, 
+    max_results: int = 2, 
     topic: Literal["general", "news", "finance"] = "general", 
     include_raw_content: bool = True, 
     config: RunnableConfig = None
