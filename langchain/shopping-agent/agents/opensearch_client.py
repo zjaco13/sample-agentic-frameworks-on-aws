@@ -6,6 +6,7 @@ Supports both local Docker OpenSearch and Amazon OpenSearch Service 3.1.
 import os
 import time
 from typing import Optional, Dict, Any, List
+from urllib.parse import urlparse
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
 import boto3
@@ -32,7 +33,9 @@ def get_opensearch_client() -> OpenSearch:
     password = os.getenv('OPENSEARCH_PASSWORD', '')
 
     # Determine if we're using AWS OpenSearch Service
-    is_aws_opensearch = '.es.amazonaws.com' in host or '.aoss.amazonaws.com' in host
+    # Safely check if the hostname (not arbitrary parts of URL) ends with AWS domains
+    hostname = host if '://' not in host else urlparse(f'https://{host}' if not host.startswith(('http://', 'https://')) else host).hostname or host
+    is_aws_opensearch = hostname.endswith('.es.amazonaws.com') or hostname.endswith('.aoss.amazonaws.com')
 
     if is_aws_opensearch:
         # Amazon OpenSearch Service configuration
