@@ -78,9 +78,41 @@ def get_customer_id_from_identifier(identifier: str) -> Optional[int]:
     return None 
 
 def format_user_memory(user_data):
-    """Formats music preferences from users, if available."""
+    """
+    Formats customer preferences from memory for use in agent context.
+
+    Args:
+        user_data: Dictionary containing 'memory' key with customer profile
+
+    Returns:
+        str: Formatted string of customer preferences
+    """
     profile = user_data['memory']
-    result = ""
+    result_parts = []
+
+    # Music preferences
     if hasattr(profile, 'music_preferences') and profile.music_preferences:
-        result += f"Music Preferences: {', '.join(profile.music_preferences)}"
-    return result.strip()
+        result_parts.append(f"Music Preferences: {', '.join(profile.music_preferences)}")
+
+    # Favorite colors
+    if hasattr(profile, 'favorite_colors') and profile.favorite_colors:
+        result_parts.append(f"Favorite Colors: {', '.join(profile.favorite_colors)}")
+
+    # Dress/clothing size
+    if hasattr(profile, 'dress_size') and profile.dress_size:
+        result_parts.append(f"Dress Size: {profile.dress_size}")
+
+    # Shoe size
+    if hasattr(profile, 'shoe_size') and profile.shoe_size:
+        result_parts.append(f"Shoe Size: {profile.shoe_size}")
+
+    # Style preferences
+    if hasattr(profile, 'style_preferences') and profile.style_preferences:
+        result_parts.append(f"Style Preferences: {', '.join(profile.style_preferences)}")
+
+    # General interests
+    if hasattr(profile, 'interests') and profile.interests:
+        result_parts.append(f"Interests: {', '.join(profile.interests)}")
+
+    result = "\n".join(result_parts)
+    return result.strip() if result else "No preferences stored yet"

@@ -91,9 +91,12 @@ RESPONSE GUIDELINES:
 
 PERSONALIZATION:
 - Use customer's loaded_memory (their shopping preferences) for recommendations
+- Consider their favorite colors, sizes, style preferences, and interests when suggesting products
+- Filter products based on their dress size and shoe size when relevant
 - Tailor suggestions to match their stated interests and past behavior
 - Combine semantic search with user preferences for best results
 - If no memory available, focus on promoted products and popular items
+- IMPORTANT: When customer memory includes sizes or color preferences, PRIORITIZE products matching those criteria
 
 IMPORTANT:
 - ONLY recommend products that are in stock (current_stock > 0)
@@ -123,23 +126,35 @@ If they have provided the identifier but cannot be found, please ask them to rev
 # ------------------------------------------------------------
 # Long Term Memory Prompts
 # ------------------------------------------------------------
-create_memory_prompt = """You are an expert analyst that is observing a conversation that has taken place between a customer and a customer support assistant. The customer support assistant works for a digital music store, and has utilized a multi-agent team to answer the customer's request. 
-You are tasked with analyzing the conversation that has taken place between the customer and the customer support assistant, and updating the memory profile associated with the customer. 
-You specifically care about saving any music interest the customer has shared about themselves, particularly their music preferences to their memory profile.
+create_memory_prompt = """You are an expert analyst that is observing a conversation that has taken place between a customer and a shopping assistant. The shopping assistant works for an e-commerce platform, and has utilized a multi-agent team to answer the customer's request.
+You are tasked with analyzing the conversation that has taken place between the customer and the shopping assistant, and updating the memory profile associated with the customer.
+You specifically care about saving any preferences, interests, and personal details the customer has shared about themselves.
 
 <core_instructions>
 1. The memory profile may be empty. If it's empty, you should ALWAYS create a new memory profile for the customer.
-2. You should identify any music interest the customer during the conversation and add it to the memory profile **IF** it is not already present.
+2. You should identify ANY preferences or personal information shared by the customer during the conversation and add it to the memory profile **IF** it is not already present.
 3. For each key in the memory profile, if there is no new information, do NOT update the value - keep the existing value unchanged.
 4. ONLY update the values in the memory profile if there is new information.
+5. Extract ALL relevant information including:
+   - Music preferences (genres they like)
+   - Favorite colors (especially for clothing and products)
+   - Clothing/dress size (S, M, L, XL, or numeric sizes)
+   - Shoe size (numeric or EU sizes)
+   - Style preferences (casual, formal, athletic, vintage, etc.)
+   - General interests and hobbies (hiking, cooking, gaming, reading, etc.)
 </core_instructions>
 
 <expected_format>
 The customer's memory profile should have the following fields:
 - customer_id: the customer ID of the customer
-- music_preferences: the music preferences of the customer
+- music_preferences: list of music genres/artists the customer likes (e.g., ["rock", "jazz"])
+- favorite_colors: list of favorite colors for clothing/products (e.g., ["blue", "black", "red"])
+- dress_size: the customer's clothing/dress size (e.g., "M", "L", "10", leave empty if not mentioned)
+- shoe_size: the customer's shoe size (e.g., "9", "42", leave empty if not mentioned)
+- style_preferences: list of style preferences (e.g., ["casual", "athletic"])
+- interests: list of general interests and hobbies (e.g., ["hiking", "cooking", "gaming"])
 
-IMPORTANT: ENSURE your response is an object with these fields.
+IMPORTANT: ENSURE your response is an object with ALL these fields. Use empty lists [] or empty strings "" for fields without information.
 </expected_format>
 
 

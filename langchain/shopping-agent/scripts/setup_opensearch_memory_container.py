@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Setup OpenSearch agentic memory container for customer preferences.
+
+This script creates a memory container using OpenSearch's native agentic memory APIs
+to store and retrieve customer preferences with semantic search capabilities.
+
+Run this once after setting up the OpenSearch product catalog and ML models.
+
+Reference: https://docs.opensearch.org/latest/ml-commons-plugin/agentic-memory/
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from dotenv import load_dotenv
+from agents.opensearch_client import get_opensearch_client
+
+# Load environment variables
+load_dotenv()
+
+
+def create_memory_container(client, embedding_model_id: str, llm_model_id: str = None) -> str:
+    """
+    Create an agentic memory container for customer preferences.
+
+    Args:
+        client: OpenSearch client instance
+        embedding_model_id: ID of the text embedding model (required for semantic search)
+        llm_model_id: ID of the LLM model (optional, but recommended for long-term memory)
+
+    Returns:
+        str: The created memory container ID
+    """
+    print("Creating agentic memory container for customer preferences...")
+
+    # Configuration for memory container
+    # Uses USER_PREFERENCE strategy which is ideal for storing customer preferences
+    memory_config = {
+        "name": "customer-preferences-memory",
+        "description": "Stores customer music preferences for personalized shopping recommendations",
+        "configuration": {
+            "embedding_model_type": "TEXT_EMBEDDING",
+            "embedding_model_id": embedding_model_id,
+            "strategies": [
+                {
+                    "type": "USER_PREFERENCE",
+                    "namespace": ["customer_id"]
+                }
+            ]
+        }
+    }
+
+    # Add LLM configuration if provided (enables long-term memory processing)
+    if llm_model_id:
+        memory_config["configuration"]["llm_id"] = llm_model_id
+        print(f"  ✓ Using LLM model: {llm_model_id} for memory processing")
+    else:
+        print("  ⚠ No LLM model specified - long-term memory features will be limited")
+
+    # Create the memory container
+    try:
+        response = client.transport.perform_request(
+            'POST',
+            '/_plugins/_ml/memory_containers/_create',
+            body=memory_config
+        )
+
+        memory_id = response.get('memory_id')
+        if not memory_id:
+            raise ValueError("No memory_id returned in response")
+
+        print(f"  ✓ Memory container created successfully!")
+        print(f"  Memory Container ID: {memory_id}")
+        print(f"\n  Add this to your .env file:")
+        print(f"  OPENSEARCH_MEMORY_CONTAINER_ID=\"{memory_id}\"")
+
+        return memory_id
+
+    except Exception as e:
+        print(f"  ✗ Error creating memory container: {e}")
+        if hasattr(e, 'info'):
+            print(f"  Details: {e.info}")
+        raise
+
+
+def verify_memory_container(client, memory_id: str) -> bool:
+    """
+    Verify that the memory container was created successfully.
+
+    Args:
+        client: OpenSearch client instance
+        memory_id: Memory container ID to verify
+
+    Returns:
+        bool: True if container exists and is accessible
+    """
+    print(f"\nVerifying memory container {memory_id}...")
+
+    try:
+        # Search for the memory container
+        search_body = {
+            "query": {
+                "term": {
+                    "_id": memory_id
+                }
+            }
+        }
+
+        response = client.transport.perform_request(
+            'GET',
+            '/_plugins/_ml/memory_containers/_search',
+            body=search_body
+        )
+
+        hits = response.get('hits', {}).get('hits', [])
+        if hits:
+            container = hits[0]['_source']
+            print(f"  ✓ Memory container verified!")
+            print(f"  Name: {container.get('name')}")
+            print(f"  Description: {container.get('description')}")
+            return True
+        else:
+            print(f"  ✗ Memory container not found")
+            return False
+
+    except Exception as e:
+        print(f"  ✗ Error verifying memory container: {e}")
+        return False
+
+
+def main():
+    """Main setup function."""
+    print("=" * 70)
+    print("OpenSearch Agentic Memory Container Setup")
+    print("=" * 70)
+    print()
+
+    # Get configuration from environment
+    embedding_model_id = os.getenv('OPENSEARCH_MODEL_ID')
+    llm_model_id = os.getenv('OPENSEARCH_LLM_MODEL_ID')
+
+    if not embedding_model_id:
+        print("ERROR: OPENSEARCH_MODEL_ID not set in .env file")
+        print("Please run scripts/setup_opensearch.py first to register the embedding model")
+        sys.exit(1)
+
+    print(f"Configuration:")
+    print(f"  Embedding Model ID: {embedding_model_id}")
+    print(f"  LLM Model ID: {llm_model_id or 'Not configured'}")
+    print()
+
+    # Get OpenSearch client
+    try:
+        client = get_opensearch_client()
+        print("✓ Connected to OpenSearch")
+        print()
+    except Exception as e:
+        print(f"✗ Failed to connect to OpenSearch: {e}")
+        sys.exit(1)
+
+    # Create memory container
+    try:
+        memory_id = create_memory_container(client, embedding_model_id, llm_model_id)
+    except Exception as e:
+        print(f"\n✗ Setup failed: {e}")
+        sys.exit(1)
+
+    # Verify the container
+    if verify_memory_container(client, memory_id):
+        print("\n" + "=" * 70)
+        print("✓ Agentic memory container setup complete!")
+        print("=" * 70)
+        print("\nNext steps:")
+        print("1. Add OPENSEARCH_MEMORY_CONTAINER_ID to your .env file")
+        print("2. Restart your shopping agent application")
+        print("3. Customer preferences will now persist in OpenSearch")
+    else:
+        print("\n✗ Verification failed - please check the setup")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

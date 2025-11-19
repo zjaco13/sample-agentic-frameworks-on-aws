@@ -7,10 +7,10 @@ from langchain.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import AnyMessage, add_messages
 from langgraph.managed.is_last_step import RemainingSteps
-from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
 from agents.subagents import invoice_subagent, opensearch_subagent
+from agents.opensearch_memory_client import get_memory_client
 from agents.prompts import (
     supervisor_routing_prompt,
     supervisor_system_prompt,
@@ -143,32 +143,99 @@ def should_interrupt(state: State):
 
 
 # ------------------------------------------------------------
-# Long Term Memory Nodes
+# Long Term Memory Nodes - Using OpenSearch Agentic Memory
 # ------------------------------------------------------------
 
-def load_memory(state: State, store: BaseStore):
-    """Loads music preferences from users, if available."""
+def load_memory(state: State):
+    """Loads music preferences from users using OpenSearch agentic memory."""
     user_id = state["customer_id"]
-    namespace = ("memory_profile", user_id)
-    existing_memory = store.get(namespace, "user_memory")
     formatted_memory = ""
-    if existing_memory and existing_memory.value:
-        formatted_memory = format_user_memory(existing_memory.value)
-    return {"loaded_memory" : formatted_memory}
+
+    try:
+        # Get memory client (uses OPENSEARCH_MEMORY_CONTAINER_ID from env)
+        memory_client = get_memory_client()
+
+        # Retrieve customer memory from OpenSearch
+        existing_memory = memory_client.get_customer_memory(customer_id=user_id)
+
+        if existing_memory and existing_memory.get('preferences'):
+            # Format the memory for use in the agent
+            formatted_memory = format_user_memory({"memory": existing_memory['preferences']})
+            print(f"[Memory] Loaded preferences for customer {user_id}")
+        else:
+            print(f"[Memory] No existing preferences found for customer {user_id}")
+
+    except Exception as e:
+        print(f"[Memory] Error loading memory: {e}")
+        # Gracefully degrade - continue without memory
+
+    return {"loaded_memory": formatted_memory}
 
 # User profile structure for creating memory
 class UserProfile(BaseModel):
     customer_id: str = Field(description="The customer ID of the customer")
-    music_preferences: List[str] = Field(description="The music preferences of the customer")
+    music_preferences: List[str] = Field(
+        default_factory=list,
+        description="The music preferences of the customer (e.g., rock, jazz, classical)"
+    )
+    favorite_colors: List[str] = Field(
+        default_factory=list,
+        description="The customer's favorite colors for clothing and products (e.g., blue, black, red)"
+    )
+    dress_size: str = Field(
+        default="",
+        description="The customer's dress/clothing size (e.g., S, M, L, XL, or numeric sizes)"
+    )
+    shoe_size: str = Field(
+        default="",
+        description="The customer's shoe size (e.g., 8, 9, 10, or EU sizes)"
+    )
+    style_preferences: List[str] = Field(
+        default_factory=list,
+        description="The customer's style preferences (e.g., casual, formal, athletic, vintage)"
+    )
+    interests: List[str] = Field(
+        default_factory=list,
+        description="General interests and hobbies (e.g., hiking, cooking, gaming, reading)"
+    )
 
-def create_memory(state: State, store: BaseStore):
+def create_memory(state: State):
+    """Updates customer preferences using OpenSearch agentic memory."""
     user_id = str(state["customer_id"])
-    namespace = ("memory_profile", user_id)
-    formatted_memory = state["loaded_memory"]
-    formatted_system_message = SystemMessage(content=create_memory_prompt.format(conversation=state["messages"], memory_profile=formatted_memory))
-    updated_memory = llm.with_structured_output(UserProfile).invoke([formatted_system_message])
-    key = "user_memory"
-    store.put(namespace, key, {"memory": updated_memory})
+    formatted_memory = state.get("loaded_memory", "")
+
+    try:
+        # Get memory client (uses OPENSEARCH_MEMORY_CONTAINER_ID from env)
+        memory_client = get_memory_client()
+
+        # Use LLM to extract updated preferences from conversation
+        formatted_system_message = SystemMessage(
+            content=create_memory_prompt.format(
+                conversation=state["messages"],
+                memory_profile=formatted_memory
+            )
+        )
+        updated_memory = llm.with_structured_output(UserProfile).invoke([formatted_system_message])
+
+        # Convert Pydantic model to dict for storage
+        preferences_dict = {
+            "customer_id": updated_memory.customer_id,
+            "music_preferences": updated_memory.music_preferences
+        }
+
+        # Store in OpenSearch agentic memory
+        memory_id = memory_client.add_customer_memory(
+            customer_id=user_id,
+            preferences=preferences_dict
+        )
+
+        print(f"[Memory] Updated preferences for customer {user_id} (memory_id: {memory_id})")
+
+    except Exception as e:
+        print(f"[Memory] Error creating/updating memory: {e}")
+        # Continue even if memory update fails
+
+    return {}
 
 
 # ------------------------------------------------------------
