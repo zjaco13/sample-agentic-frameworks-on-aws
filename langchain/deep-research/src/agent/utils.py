@@ -34,6 +34,22 @@ from agent.prompts import summarize_webpage_prompt
 from agent.state import ResearchComplete, Summary
 
 ##########################
+# AWS Credentials Setup
+##########################
+def setup_bedrock_credentials():
+    """Set up AWS credentials from BEDROCK_* environment variables if standard AWS_* vars are not set."""
+    # Only set if standard AWS credentials are not already set
+    if not os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("BEDROCK_AWS_ACCESS_KEY_ID"):
+        os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("BEDROCK_AWS_ACCESS_KEY_ID")
+    if not os.getenv("AWS_SECRET_ACCESS_KEY") and os.getenv("BEDROCK_AWS_SECRET_ACCESS_KEY"):
+        os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("BEDROCK_AWS_SECRET_ACCESS_KEY")
+    if not os.getenv("AWS_DEFAULT_REGION") and os.getenv("BEDROCK_AWS_REGION"):
+        os.environ["AWS_DEFAULT_REGION"] = os.getenv("BEDROCK_AWS_REGION")
+    # Also set AWS_REGION if not set
+    if not os.getenv("AWS_REGION") and os.getenv("BEDROCK_AWS_REGION"):
+        os.environ["AWS_REGION"] = os.getenv("BEDROCK_AWS_REGION")
+
+##########################
 # Tavily Search Tool Utils
 ##########################
 TAVILY_SEARCH_DESCRIPTION = (
@@ -82,12 +98,14 @@ async def tavily_search(
     max_char_to_include = configurable.max_content_length
     
     # Initialize summarization model with retry logic
-    model_api_key = get_api_key_for_model(configurable.summarization_model, config)
-    summarization_model = init_chat_model(
-        model=configurable.summarization_model,
-        max_tokens=configurable.summarization_model_max_tokens,
-        api_key=model_api_key,
+    summarization_model_config = build_model_config(
+        configurable.summarization_model,
+        configurable.summarization_model_max_tokens,
+        config,
         tags=["langsmith:nostream"]
+    )
+    summarization_model = init_chat_model(
+        **summarization_model_config
     ).with_structured_output(Summary).with_retry(
         stop_after_attempt=configurable.max_structured_output_retries
     )
@@ -890,9 +908,20 @@ def get_config_value(value):
         return value.value
 
 def get_api_key_for_model(model_name: str, config: RunnableConfig):
-    """Get API key for a specific model from environment or config."""
+    """Get API key for a specific model from environment or config.
+    
+    For Bedrock models, this sets up AWS credentials from BEDROCK_* env vars and returns None
+    (Bedrock uses AWS credentials instead of API keys).
+    """
     should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
     model_name = model_name.lower()
+    
+    # Bedrock models don't use API keys, they use AWS credentials
+    # Set up AWS credentials from BEDROCK_* env vars if this is a Bedrock model
+    if model_name.startswith("bedrock:"):
+        setup_bedrock_credentials()
+        return None
+    
     if should_get_from_config.lower() == "true":
         api_keys = config.get("configurable", {}).get("apiKeys", {})
         if not api_keys:
@@ -912,6 +941,33 @@ def get_api_key_for_model(model_name: str, config: RunnableConfig):
         elif model_name.startswith("google"):
             return os.getenv("GOOGLE_API_KEY")
         return None
+
+def build_model_config(model_name: str, max_tokens: int, config: RunnableConfig, tags: Optional[List[str]] = None):
+    """Build a model configuration dictionary, excluding api_key for Bedrock models.
+    
+    Args:
+        model_name: The model identifier
+        max_tokens: Maximum tokens for the model
+        config: Runtime configuration
+        tags: Optional list of tags to include
+        
+    Returns:
+        Dictionary with model configuration, excluding api_key for Bedrock models
+    """
+    api_key = get_api_key_for_model(model_name, config)
+    model_config = {
+        "model": model_name,
+        "max_tokens": max_tokens,
+    }
+    
+    # Only include api_key if it's not None (i.e., not a Bedrock model)
+    if api_key is not None:
+        model_config["api_key"] = api_key
+    
+    if tags:
+        model_config["tags"] = tags
+    
+    return model_config
 
 def get_tavily_api_key(config: RunnableConfig):
     """Get Tavily API key from environment or config."""
