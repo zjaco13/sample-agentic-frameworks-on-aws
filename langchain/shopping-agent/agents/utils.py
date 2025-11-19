@@ -1,19 +1,34 @@
 import ast
+import os
 import sqlite3
 import requests
 from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
+from dotenv import load_dotenv
 
-from langchain_openai import ChatOpenAI
 from langchain_community.utilities.sql_database import SQLDatabase
 
+load_dotenv()
 
-# NOTE: Configure the LLM that you want to use
-llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
+
+# ------------------------------------------------------------
+# LLM Initialization
+# ------------------------------------------------------------
+# NOTE: AWS Bedrock has a known incompatibility with LangChain's create_agent tool calling.
+# See docs/BEDROCK_LIMITATION.md for details. Using OpenAI for reliable tool calling support.
+
+from langchain_openai import ChatOpenAI
+
+model = os.getenv("OPENAI_MODEL", "gpt-4o")
+print(f"Initializing OpenAI: {model}")
+
+llm = ChatOpenAI(
+    model=model,
+    temperature=0
+)
 # llm = ChatAnthropic(model_name="claude-3-5-sonnet-20240620", temperature=0)
 # llm = ChatVertexAI(model_name="gemini-1.5-flash-002", temperature=0)
-
 # ------------------------------------------------------------
 # Database Utilities
 # ------------------------------------------------------------

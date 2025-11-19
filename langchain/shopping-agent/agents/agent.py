@@ -3,8 +3,6 @@ from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 
 from langchain.messages import SystemMessage, HumanMessage, AIMessage
-from langchain.agents import create_agent
-from langchain.tools import tool, ToolRuntime
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import AnyMessage, add_messages
@@ -12,8 +10,9 @@ from langgraph.managed.is_last_step import RemainingSteps
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
-from agents.subagents import invoice_subagent
+from agents.subagents import invoice_subagent, opensearch_subagent
 from agents.prompts import (
+    supervisor_routing_prompt,
     supervisor_system_prompt,
     extract_customer_info_prompt,
     verify_customer_info_prompt,
@@ -35,34 +34,69 @@ class InputState(TypedDict):
 class State(InputState):
     customer_id: NotRequired[str]
     loaded_memory: NotRequired[str]
+    next_agent: NotRequired[str]  # For conditional routing
 
 
 # ------------------------------------------------------------
-# Supervisor Graph
+# Supervisor Router - Decides which agent to route to
 # ------------------------------------------------------------
-@tool(
-    name_or_callable="invoice_subagent",
-    description="""An agent that can assistant with all invoice-related queries. It can retrieve information about a customers past purchases or invoices."""
-)
-def call_invoice_subagent(runtime: ToolRuntime, query: str):
-    print('made it here')
-    print(f"invoice subagent input: {query}")
+def supervisor_router(state: State) -> dict:
+    """
+    Supervisor that routes to appropriate subagent using LLM decision.
+    Uses conditional routing instead of tools to avoid Bedrock ValidationException.
+    """
+    messages = state["messages"]
+
+    # Create routing prompt with conversation context
+    routing_messages = [
+        SystemMessage(content=supervisor_routing_prompt),
+        *messages
+    ]
+
+    # Get routing decision from LLM
+    response = llm.invoke(routing_messages)
+    next_agent = response.content.strip()
+
+    print(f"[Supervisor] Routing decision: {next_agent}")
+
+    # Store the routing decision in state
+    return {"next_agent": next_agent}
+
+# ------------------------------------------------------------
+# Subagent Nodes - Execute specialized tasks
+# ------------------------------------------------------------
+def invoice_agent_node(state: State) -> dict:
+    """Node that executes the invoice subagent."""
+    print(f"[Invoice Agent] Processing query")
+
+    # Get only user messages (filter out supervisor routing messages)
+    user_messages = [msg for msg in state["messages"] if msg.type in ["human", "user"]]
+
+    # Invoke the invoice subagent with clean message history
     result = invoice_subagent.invoke({
-        "messages": [{"role": "user", "content": query}],
-        "customer_id": runtime.state.get("customer_id", {})
+        "messages": user_messages,  # Only user messages, no tool_use artifacts
+        "customer_id": state.get("customer_id", ""),
     })
-    subagent_response = result["messages"][-1].content
-    return subagent_response
 
-# TODO: Add Opensearch E-commerce Agent as tool
+    # Return the subagent's response as new messages
+    return {"messages": result["messages"]}
 
-supervisor = create_agent(
-    model="openai:gpt-4o", 
-    tools=[call_invoice_subagent], # TODO: Add Opensearch E-commerce Agent as tool
-    name="supervisor",
-    system_prompt=supervisor_system_prompt, 
-    state_schema=State, 
-)
+def opensearch_agent_node(state: State) -> dict:
+    """Node that executes the opensearch subagent."""
+    print(f"[OpenSearch Agent] Processing query")
+
+    # Get only user messages (filter out supervisor routing messages)
+    user_messages = [msg for msg in state["messages"] if msg.type in ["human", "user"]]
+
+    # Invoke the opensearch subagent with clean message history
+    result = opensearch_subagent.invoke({
+        "messages": user_messages,  # Only user messages, no tool_use artifacts
+        "customer_id": state.get("customer_id", ""),
+        "loaded_memory": state.get("loaded_memory", "")
+    })
+
+    # Return the subagent's response as new messages
+    return {"messages": result["messages"]}
 
 # ------------------------------------------------------------
 # Human Feedback Nodes
@@ -138,15 +172,26 @@ def create_memory(state: State, store: BaseStore):
 
 
 # ------------------------------------------------------------
-# State Graph
+# State Graph with Conditional Routing
 # ------------------------------------------------------------
-workflow_builder = StateGraph(State, input_schema = InputState) 
+def route_after_supervisor(state: State) -> str:
+    """Route to the appropriate agent based on supervisor's decision."""
+    next_agent = state.get("next_agent", "FINISH")
+    print(f"[Router] Directing to: {next_agent}")
+    return next_agent
+
+workflow_builder = StateGraph(State, input_schema = InputState)
+
+# Add all nodes
 workflow_builder.add_node("verify_info", verify_info)
 workflow_builder.add_node("human_input", human_input)
 workflow_builder.add_node("load_memory", load_memory)
-workflow_builder.add_node("supervisor", supervisor)
+workflow_builder.add_node("supervisor", supervisor_router)  # Router, not agent
+workflow_builder.add_node("opensearch_agent", opensearch_agent_node)  # Subagent node
+workflow_builder.add_node("invoice_agent", invoice_agent_node)  # Subagent node
 workflow_builder.add_node("create_memory", create_memory)
 
+# Build the workflow
 workflow_builder.add_edge(START, "verify_info")
 workflow_builder.add_conditional_edges(
     "verify_info",
@@ -158,7 +203,24 @@ workflow_builder.add_conditional_edges(
 )
 workflow_builder.add_edge("human_input", "verify_info")
 workflow_builder.add_edge("load_memory", "supervisor")
-workflow_builder.add_edge("supervisor", "create_memory")
+
+# Conditional routing from supervisor to agents
+workflow_builder.add_conditional_edges(
+    "supervisor",
+    route_after_supervisor,
+    {
+        "opensearch_agent": "opensearch_agent",
+        "invoice_agent": "invoice_agent",
+        "FINISH": "create_memory"
+    }
+)
+
+# Both agents return to create_memory
+workflow_builder.add_edge("opensearch_agent", "create_memory")
+workflow_builder.add_edge("invoice_agent", "create_memory")
 workflow_builder.add_edge("create_memory", END)
 
+# Compile the graph
+# LangGraph API (dev or cloud) provides managed persistence automatically.
+# Do not use a custom store - the platform handles it.
 graph = workflow_builder.compile(name="multi_agent_verify")
