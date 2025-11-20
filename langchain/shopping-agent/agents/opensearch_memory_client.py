@@ -90,15 +90,16 @@ class OpenSearchMemoryClient:
                             "type": "text",
                             "text": preference_text
                         }
-                    ],
-                    "metadata": {
-                        "preferences": preferences,
-                        "updated_at": datetime.utcnow().isoformat()
-                    }
+                    ]
                 }
             ],
             "namespace": {"customer_id": customer_id},
-            "tags": tags or {"type": "user_preferences"}
+            "tags": tags or {"type": "user_preferences"},
+            # Store preferences in document-level metadata field
+            "metadata": {
+                "preferences": preferences,
+                "updated_at": datetime.utcnow().isoformat()
+            }
         }
 
         # Add session ID if provided
@@ -112,9 +113,10 @@ class OpenSearchMemoryClient:
                 body=memory_data
             )
 
-            memory_id = response.get('memory_id')
+            # OpenSearch returns 'working_memory_id' not 'memory_id'
+            memory_id = response.get('working_memory_id') or response.get('memory_id')
             if not memory_id:
-                raise ValueError("No memory_id returned from OpenSearch")
+                raise ValueError(f"No memory_id or working_memory_id returned from OpenSearch. Response: {response}")
 
             return memory_id
 
@@ -143,7 +145,12 @@ class OpenSearchMemoryClient:
             ...     print(memory['preferences']['music_preferences'])
         """
         try:
-            # Search for memories by customer ID
+            # Query the underlying system index directly
+            # Memories are stored in .plugins-ml-am-{index_prefix}-memory-working
+            index_name = ".plugins-ml-am-default-memory-working"
+
+            # Search for customer's memory in the container
+            # Note: namespace is a flat_object type - term query works for exact matching
             search_query = {
                 "query": {
                     "bool": {
@@ -152,12 +159,17 @@ class OpenSearchMemoryClient:
                                 "term": {
                                     "namespace.customer_id": customer_id
                                 }
+                            },
+                            {
+                                "term": {
+                                    "memory_container_id": self.memory_container_id
+                                }
                             }
                         ]
                     }
                 },
                 "sort": [
-                    {"updated_at": {"order": "desc"}}
+                    {"last_updated_time": {"order": "desc"}}
                 ],
                 "size": 1  # Get most recent memory
             }
@@ -168,9 +180,8 @@ class OpenSearchMemoryClient:
                     "term": {"namespace.session_id": session_id}
                 })
 
-            response = self.client.transport.perform_request(
-                'GET',
-                f'/_plugins/_ml/memory_containers/{self.memory_container_id}/memories/_search',
+            response = self.client.search(
+                index=index_name,
                 body=search_query
             )
 
@@ -181,18 +192,22 @@ class OpenSearchMemoryClient:
             # Extract the most recent memory
             memory_doc = hits[0]['_source']
 
-            # Extract preferences from assistant message metadata
-            messages = memory_doc.get('messages', [])
-            for message in messages:
-                if message.get('role') == 'assistant':
-                    metadata = message.get('metadata', {})
-                    if 'preferences' in metadata:
-                        return {
-                            'preferences': metadata['preferences'],
-                            'updated_at': metadata.get('updated_at'),
-                            'memory_id': hits[0]['_id'],
-                            'namespace': memory_doc.get('namespace', {})
-                        }
+            # Extract preferences from document-level metadata
+            metadata = memory_doc.get('metadata', {})
+            if 'preferences' in metadata:
+                preferences = metadata['preferences']
+
+                # flat_object type may serialize dict as JSON string, so parse if needed
+                if isinstance(preferences, str):
+                    import json
+                    preferences = json.loads(preferences)
+
+                return {
+                    'preferences': preferences,
+                    'updated_at': memory_doc.get('last_updated_time'),
+                    'memory_id': hits[0]['_id'],
+                    'namespace': memory_doc.get('namespace', {})
+                }
 
             return None
 

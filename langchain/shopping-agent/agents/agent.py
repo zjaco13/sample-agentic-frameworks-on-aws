@@ -88,11 +88,26 @@ def opensearch_agent_node(state: State) -> dict:
     # Get only user messages (filter out supervisor routing messages)
     user_messages = [msg for msg in state["messages"] if msg.type in ["human", "user"]]
 
-    # Invoke the opensearch subagent with clean message history
+    # Add customer memory context if available
+    loaded_memory = state.get("loaded_memory", "")
+    messages_with_context = user_messages.copy()
+
+    if loaded_memory and loaded_memory != "No preferences stored yet":
+        # Prepend customer preferences as a system message for the subagent
+        memory_context = SystemMessage(
+            content=f"""CUSTOMER PROFILE AND PREFERENCES:
+{loaded_memory}
+
+Use these preferences to personalize product recommendations and filter search results.
+Prioritize products matching the customer's favorite colors, sizes, and interests."""
+        )
+        messages_with_context = [memory_context] + user_messages
+
+    # Invoke the opensearch subagent with clean message history and context
     result = opensearch_subagent.invoke({
-        "messages": user_messages,  # Only user messages, no tool_use artifacts
+        "messages": messages_with_context,
         "customer_id": state.get("customer_id", ""),
-        "loaded_memory": state.get("loaded_memory", "")
+        "loaded_memory": loaded_memory
     })
 
     # Return the subagent's response as new messages
@@ -220,7 +235,12 @@ def create_memory(state: State):
         # Convert Pydantic model to dict for storage
         preferences_dict = {
             "customer_id": updated_memory.customer_id,
-            "music_preferences": updated_memory.music_preferences
+            "music_preferences": updated_memory.music_preferences,
+            "favorite_colors": updated_memory.favorite_colors,
+            "dress_size": updated_memory.dress_size,
+            "shoe_size": updated_memory.shoe_size,
+            "style_preferences": updated_memory.style_preferences,
+            "interests": updated_memory.interests
         }
 
         # Store in OpenSearch agentic memory

@@ -91,28 +91,34 @@ def format_user_memory(user_data):
     result_parts = []
 
     # Music preferences
-    if hasattr(profile, 'music_preferences') and profile.music_preferences:
-        result_parts.append(f"Music Preferences: {', '.join(profile.music_preferences)}")
+    music_prefs = profile.get('music_preferences', [])
+    if music_prefs:
+        result_parts.append(f"Music Preferences: {', '.join(music_prefs)}")
 
     # Favorite colors
-    if hasattr(profile, 'favorite_colors') and profile.favorite_colors:
-        result_parts.append(f"Favorite Colors: {', '.join(profile.favorite_colors)}")
+    colors = profile.get('favorite_colors', [])
+    if colors:
+        result_parts.append(f"Favorite Colors: {', '.join(colors)}")
 
     # Dress/clothing size
-    if hasattr(profile, 'dress_size') and profile.dress_size:
-        result_parts.append(f"Dress Size: {profile.dress_size}")
+    dress_size = profile.get('dress_size', '')
+    if dress_size:
+        result_parts.append(f"Clothing Size: {dress_size}")
 
     # Shoe size
-    if hasattr(profile, 'shoe_size') and profile.shoe_size:
-        result_parts.append(f"Shoe Size: {profile.shoe_size}")
+    shoe_size = profile.get('shoe_size', '')
+    if shoe_size:
+        result_parts.append(f"Shoe Size: {shoe_size}")
 
     # Style preferences
-    if hasattr(profile, 'style_preferences') and profile.style_preferences:
-        result_parts.append(f"Style Preferences: {', '.join(profile.style_preferences)}")
+    style_prefs = profile.get('style_preferences', [])
+    if style_prefs:
+        result_parts.append(f"Style Preferences: {', '.join(style_prefs)}")
 
     # General interests
-    if hasattr(profile, 'interests') and profile.interests:
-        result_parts.append(f"Interests: {', '.join(profile.interests)}")
+    interests = profile.get('interests', [])
+    if interests:
+        result_parts.append(f"Interests: {', '.join(interests)}")
 
     result = "\n".join(result_parts)
     return result.strip() if result else "No preferences stored yet"
