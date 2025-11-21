@@ -546,6 +546,60 @@ async def load_mcp_tools(
 # Tool Utils
 ##########################
 
+async def load_duckduckgo_from_mcp(config: RunnableConfig) -> Optional[BaseTool]:
+    """Load DuckDuckGo search tool from MCP server.
+    
+    Args:
+        config: Runtime configuration containing MCP server details
+        
+    Returns:
+        DuckDuckGo tool if available from MCP server, None otherwise
+    """
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Check if MCP is configured
+    if not configurable.mcp_config or not configurable.mcp_config.url:
+        return None
+    
+    try:
+        # Set up MCP client connection
+        server_url = configurable.mcp_config.url.rstrip("/") + "/_plugins/_ml/mcp"
+        
+        mcp_server_config = {
+            "opensearch": {
+                "transport": "streamable_http",
+                "url": server_url,
+            }
+        }
+        
+        # Load tools from MCP server
+        client = MultiServerMCPClient(mcp_server_config)
+        available_tools = await client.get_tools()
+        
+        # Find DuckDuckGo tool
+        duckduckgo_tool = next(
+            (tool for tool in available_tools if tool.name == 'DuckduckgoWebSearchTool'), 
+            None
+        )
+        
+        if duckduckgo_tool:
+            logging.info("Successfully loaded DuckDuckGo tool from MCP server")
+            search_tool = duckduckgo_tool
+            search_tool.metadata = {
+                **(search_tool.metadata or {}), 
+                "type": "search", 
+                "name": "web_search"
+            }
+            return [search_tool]
+        else:
+            logging.warning("DuckDuckGo tool not found in MCP server tools")
+            return None
+            
+    except Exception as e:
+        logging.warning(f"Failed to load DuckDuckGo from MCP server: {e}")
+        return None
+
+
 async def get_search_tool(search_api: SearchAPI):
     """Configure and return search tools based on the specified API provider.
     
@@ -598,9 +652,13 @@ async def get_all_tools(config: RunnableConfig):
     
     # Add configured search tools
     configurable = Configuration.from_runnable_config(config)
+
+    duckduckgo_tool = await load_duckduckgo_from_mcp(config)
+
     search_api = SearchAPI(get_config_value(configurable.search_api))
-    search_tools = await get_search_tool(search_api)
-    tools.extend(search_tools)
+    # search_tools = await get_search_tool(search_api)
+    # tools.extend(search_tools)
+    tools.extend(duckduckgo_tool)
     
     # Track existing tool names to prevent conflicts
     existing_tool_names = {

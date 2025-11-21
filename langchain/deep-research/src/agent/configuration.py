@@ -119,11 +119,11 @@ class Configuration(BaseModel):
     )
     # Model Configuration
     summarization_model: str = Field(
-        default="bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+        default="bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
         metadata={
             "x_oap_ui_config": {
                 "type": "text",
-                "default": "bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+                "default": "bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "description": "Model for summarizing research results from Tavily search results"
             }
         }
@@ -151,11 +151,11 @@ class Configuration(BaseModel):
         }
     )
     research_model: str = Field(
-        default="bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+        default="bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
         metadata={
             "x_oap_ui_config": {
                 "type": "text",
-                "default": "bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+                "default": "bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "description": "Model for conducting research. NOTE: Make sure your Researcher Model supports the selected search API."
             }
         }
@@ -171,11 +171,11 @@ class Configuration(BaseModel):
         }
     )
     compression_model: str = Field(
-        default="bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+        default="bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
         metadata={
             "x_oap_ui_config": {
                 "type": "text",
-                "default": "bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+                "default": "bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "description": "Model for compressing research findings from sub-agents. NOTE: Make sure your Compression Model supports the selected search API."
             }
         }
@@ -191,11 +191,11 @@ class Configuration(BaseModel):
         }
     )
     final_report_model: str = Field(
-        default="bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+        default="bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
         metadata={
             "x_oap_ui_config": {
                 "type": "text",
-                "default": "bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0",
+                "default": "bedrock:global.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "description": "Model for writing the final report from all research findings"
             }
         }
@@ -212,17 +212,21 @@ class Configuration(BaseModel):
     )
     # MCP server configuration
     mcp_config: Optional[MCPConfig] = Field(
-        default=None,
+        default_factory=lambda: MCPConfig(
+            url="http://localhost:9200",
+            tools=["DuckduckgoWebSearchTool"],
+            auth_required=False
+        ),
         optional=True,
         metadata={
             "x_oap_ui_config": {
                 "type": "mcp",
-                "description": "MCP server configuration"
+                "description": "MCP server configuration for OpenSearch with DuckDuckGo search tool"
             }
         }
     )
     mcp_prompt: Optional[str] = Field(
-        default=None,
+        default="Use the DuckduckgoWebSearchTool to search the web for current information. This tool provides comprehensive search results from DuckDuckGo.",
         optional=True,
         metadata={
             "x_oap_ui_config": {
@@ -244,6 +248,18 @@ class Configuration(BaseModel):
             field_name: os.environ.get(field_name.upper(), configurable.get(field_name))
             for field_name in field_names
         }
+        # Handle MCP configuration from environment variables if not in configurable
+        if "mcp_config" not in configurable and not values.get("mcp_config"):
+            mcp_url = os.environ.get("MCP_URL", "http://localhost:9200")
+            mcp_tools = os.environ.get("MCP_TOOLS", "DuckduckgoWebSearchTool").split(",")
+            mcp_auth = os.environ.get("MCP_AUTH_REQUIRED", "false").lower() == "false"
+            
+            values["mcp_config"] = MCPConfig(
+                url=mcp_url,
+                tools=mcp_tools,
+                auth_required=mcp_auth
+            )
+
         return cls(**{k: v for k, v in values.items() if v is not None})
 
     class Config:
