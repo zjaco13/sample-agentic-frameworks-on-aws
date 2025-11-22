@@ -19,10 +19,11 @@ from agents.prompts import (
     create_memory_prompt
 )
 from agents.utils import (
-    llm, 
+    llm,
     get_customer_id_from_identifier,
     format_user_memory
 )
+from agents.timing import timing_decorator, get_performance_monitor
 
 
 # ------------------------------------------------------------
@@ -40,14 +41,37 @@ class State(InputState):
 # ------------------------------------------------------------
 # Supervisor Router - Decides which agent to route to
 # ------------------------------------------------------------
+@timing_decorator("supervisor_router")
 def supervisor_router(state: State) -> dict:
     """
     Supervisor that routes to appropriate subagent using LLM decision.
     Uses conditional routing instead of tools to avoid Bedrock ValidationException.
+    Implements fast-path routing for obvious queries to reduce LLM overhead.
     """
     messages = state["messages"]
+    last_message = messages[-1].content.lower() if messages else ""
 
-    # Create routing prompt with conversation context
+    # FAST PATH: Skip LLM for obvious product search queries
+    product_keywords = [
+        "show", "find", "search", "product", "buy", "recommend", "looking for",
+        "want", "need", "get me", "available", "stock", "price", "category",
+        "filter", "sort", "list", "browse", "shop", "purchase"
+    ]
+    if any(keyword in last_message for keyword in product_keywords):
+        print(f"[Supervisor] Fast-path routing to opensearch_agent (product query detected)")
+        return {"next_agent": "opensearch_agent"}
+
+    # FAST PATH: Skip LLM for obvious invoice queries
+    invoice_keywords = [
+        "invoice", "order", "billing", "purchase history", "payment",
+        "receipt", "transaction", "paid", "charged", "refund", "statement"
+    ]
+    if any(keyword in last_message for keyword in invoice_keywords):
+        print(f"[Supervisor] Fast-path routing to invoice_agent (invoice query detected)")
+        return {"next_agent": "invoice_agent"}
+
+    # FALLBACK: Use LLM routing for ambiguous queries
+    print(f"[Supervisor] Using LLM routing for ambiguous query")
     routing_messages = [
         SystemMessage(content=supervisor_routing_prompt),
         *messages
@@ -57,7 +81,7 @@ def supervisor_router(state: State) -> dict:
     response = llm.invoke(routing_messages)
     next_agent = response.content.strip()
 
-    print(f"[Supervisor] Routing decision: {next_agent}")
+    print(f"[Supervisor] LLM routing decision: {next_agent}")
 
     # Store the routing decision in state
     return {"next_agent": next_agent}
@@ -65,6 +89,7 @@ def supervisor_router(state: State) -> dict:
 # ------------------------------------------------------------
 # Subagent Nodes - Execute specialized tasks
 # ------------------------------------------------------------
+@timing_decorator("invoice_agent")
 def invoice_agent_node(state: State) -> dict:
     """Node that executes the invoice subagent."""
     print(f"[Invoice Agent] Processing query")
@@ -81,6 +106,7 @@ def invoice_agent_node(state: State) -> dict:
     # Return the subagent's response as new messages
     return {"messages": result["messages"]}
 
+@timing_decorator("opensearch_agent")
 def opensearch_agent_node(state: State) -> dict:
     """Node that executes the opensearch subagent."""
     print(f"[OpenSearch Agent] Processing query")
@@ -161,6 +187,7 @@ def should_interrupt(state: State):
 # Long Term Memory Nodes - Using OpenSearch Agentic Memory
 # ------------------------------------------------------------
 
+@timing_decorator("load_memory")
 def load_memory(state: State):
     """Loads music preferences from users using OpenSearch agentic memory."""
     user_id = state["customer_id"]
@@ -214,10 +241,29 @@ class UserProfile(BaseModel):
         description="General interests and hobbies (e.g., hiking, cooking, gaming, reading)"
     )
 
+@timing_decorator("create_memory")
 def create_memory(state: State):
     """Updates customer preferences using OpenSearch agentic memory."""
     user_id = str(state["customer_id"])
     formatted_memory = state.get("loaded_memory", "")
+
+    # OPTIMIZATION: Check if conversation contains preference-related keywords
+    messages = state["messages"]
+    conversation_text = " ".join(str(msg.content).lower() for msg in messages)
+
+    preference_keywords = [
+        "size", "color", "style", "prefer", "like", "favorite", "love", "hate",
+        "small", "medium", "large", "xl", "music", "genre", "interest", "hobby",
+        "casual", "formal", "athletic", "vintage", "dress", "shoe", "clothing"
+    ]
+
+    has_preference_content = any(keyword in conversation_text for keyword in preference_keywords)
+
+    if not has_preference_content:
+        print(f"[Memory] No preference keywords detected in conversation, skipping memory update")
+        return {}
+
+    print(f"[Memory] Preference keywords detected, updating customer preferences")
 
     try:
         # Get memory client (uses OPENSEARCH_MEMORY_CONTAINER_ID from env)

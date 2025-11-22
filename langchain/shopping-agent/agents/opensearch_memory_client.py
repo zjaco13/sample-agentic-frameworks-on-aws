@@ -13,6 +13,7 @@ from datetime import datetime
 from opensearchpy import OpenSearch
 
 from agents.opensearch_client import get_opensearch_client
+from agents.memory_cache import get_customer_memory_cache
 
 
 class OpenSearchMemoryClient:
@@ -33,6 +34,7 @@ class OpenSearchMemoryClient:
         """
         self.client = client or get_opensearch_client()
         self.memory_container_id = memory_container_id or os.getenv('OPENSEARCH_MEMORY_CONTAINER_ID')
+        self.cache = get_customer_memory_cache()
 
         if not self.memory_container_id:
             raise ValueError(
@@ -118,6 +120,10 @@ class OpenSearchMemoryClient:
             if not memory_id:
                 raise ValueError(f"No memory_id or working_memory_id returned from OpenSearch. Response: {response}")
 
+            # Invalidate cache since preferences were updated
+            self.cache.invalidate(customer_id)
+            print(f"[MemoryCache] Invalidated cache for customer_id={customer_id}")
+
             return memory_id
 
         except Exception as e:
@@ -130,6 +136,7 @@ class OpenSearchMemoryClient:
     ) -> Optional[Dict[str, Any]]:
         """
         Retrieve customer preferences from the memory container.
+        Uses in-memory cache with TTL to reduce OpenSearch query latency.
 
         Args:
             customer_id: Unique customer identifier
@@ -144,6 +151,17 @@ class OpenSearchMemoryClient:
             >>> if memory:
             ...     print(memory['preferences']['music_preferences'])
         """
+        # Check cache first (only for non-session-specific queries)
+        cache_key = f"{customer_id}:{session_id}" if session_id else customer_id
+
+        if not session_id:  # Only cache non-session-specific queries
+            cached_memory = self.cache.get(cache_key)
+            if cached_memory is not None:
+                print(f"[MemoryCache] Hit for customer_id={customer_id}")
+                return cached_memory
+            else:
+                print(f"[MemoryCache] Miss for customer_id={customer_id}")
+
         try:
             # Query the underlying system index directly
             # Memories are stored in .plugins-ml-am-{index_prefix}-memory-working
@@ -202,12 +220,18 @@ class OpenSearchMemoryClient:
                     import json
                     preferences = json.loads(preferences)
 
-                return {
+                result = {
                     'preferences': preferences,
                     'updated_at': memory_doc.get('last_updated_time'),
                     'memory_id': hits[0]['_id'],
                     'namespace': memory_doc.get('namespace', {})
                 }
+
+                # Cache the result (only for non-session-specific queries)
+                if not session_id:
+                    self.cache.set(cache_key, result)
+
+                return result
 
             return None
 
