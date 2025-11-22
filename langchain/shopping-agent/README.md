@@ -77,14 +77,19 @@ python scripts/setup_opensearch.py
 # Load product catalog (~3 minutes)
 python scripts/load_products_to_opensearch.py
 
+# Optional: Register Bedrock LLM for enhanced memory features (~2 minutes)
+# Requires: AWS credentials with Bedrock access in .env
+python scripts/register_bedrock_llm.py
+
 # Setup agentic memory container for customer preferences (~1 minute)
 python scripts/setup_opensearch_memory_container.py
 ```
 
-**After running setup_opensearch_memory_container.py:**
+**After running setup scripts:**
 
-- Copy the `OPENSEARCH_MEMORY_CONTAINER_ID` from the output
-- Add it to your `.env` file
+- Copy the `OPENSEARCH_MEMORY_CONTAINER_ID` from memory setup output
+- If you ran Bedrock LLM setup, copy the `OPENSEARCH_LLM_MODEL_ID` as well
+- Add both to your `.env` file
 
 ### 4. Run the Agent
 
