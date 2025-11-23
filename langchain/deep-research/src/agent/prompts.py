@@ -142,12 +142,12 @@ You can use any of the tools provided to you to find resources that can help ans
 </Task>
 
 <Available Tools>
-You have access to two main tools:
-1. **tavily_search**: For conducting web searches to gather information. Supply max 3 queries to this tool.
+You have access to the following tools:
+1. **WebSearchTool**: For conducting web searches to gather information using Google Custom Search. Use this tool to search the web for current information.
 2. **think_tool**: For reflection and strategic planning during research
 {mcp_prompt}
 
-**CRITICAL: Use think_tool after each search to reflect on results and plan next steps. Do not call think_tool with the tavily_search or any other tools. It should be to reflect on the results of the search.**
+**CRITICAL: Use think_tool after each search to reflect on results and plan next steps. Do not call think_tool with the WebSearchTool or any other tools. It should be to reflect on the results of the search.**
 </Available Tools>
 
 <Instructions>

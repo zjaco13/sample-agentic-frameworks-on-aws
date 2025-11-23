@@ -543,62 +543,373 @@ async def load_mcp_tools(
 
 
 ##########################
-# Tool Utils
+# OpenSearch Search Tool (via MCP)
 ##########################
 
-async def load_duckduckgo_from_mcp(config: RunnableConfig) -> Optional[BaseTool]:
+DUCKDUCKGO_SEARCH_DESCRIPTION = (
+    "A web search tool that uses DuckDuckGo to find current information. "
+    "Useful for when you need to answer questions about current events or find recent information."
+)
+
+GOOGLE_SEARCH_DESCRIPTION = (
+    "A web search tool that uses Google Custom Search to find current information. "
+    "Useful for when you need to answer questions about current events or find recent information. "
+    "Requires GOOGLE_API_KEY and GOOGLE_ENGINE_ID environment variables."
+)
+
+def create_duckduckgo_search_wrapper(mcp_tool: BaseTool):
+    """Create a wrapper tool for DuckDuckGo MCP tool with summarization.
+    
+    Args:
+        mcp_tool: The DuckDuckGo MCP tool loaded from OpenSearch
+        
+    Returns:
+        A tool function that wraps the MCP tool with summarization
+    """
+    @tool(description=DUCKDUCKGO_SEARCH_DESCRIPTION)
+    async def duckduckgo_search(
+        query: str,
+        engine: Annotated[str, InjectedToolArg] = "duckduckgo",
+        config: RunnableConfig = None
+    ) -> str:
+        """Fetch and summarize search results from DuckDuckGo via MCP.
+        
+        Args:
+            query: Search query string
+            engine: Search engine to use (default: "duckduckgo")
+            config: Runtime configuration for API keys and model settings
+            
+        Returns:
+            Formatted string containing summarized search results
+        """
+        # Execute the search via MCP tool (reuse the already-loaded tool)
+        try:
+            result = await asyncio.wait_for(
+                mcp_tool.ainvoke({"query": query, "engine": engine}, config),
+                timeout=45.0  # 45 second timeout
+            )
+        except asyncio.TimeoutError:
+            return "Search request timed out after 45 seconds. Please try again with a more specific query."
+        except McpError as e:
+            # Handle MCP errors from OpenSearch plugin - these often indicate DuckDuckGo blocking or parsing issues
+            error_msg = str(e)
+            if "failed to fetch duckduckgo results" in error_msg.lower():
+                return "DuckDuckGo search encountered an error. This may be due to rate limiting, CAPTCHA challenges, or DuckDuckGo blocking automated requests. Please try again with a different query or wait a moment."
+            return f"DuckDuckGo search error: {error_msg}. Please try again with a different query."
+        except Exception as e:
+            error_str = str(e)
+            if "closed file" in error_str.lower() or "connection" in error_str.lower():
+                return f"Search request encountered a connection error. Please try again. Error: {error_str[:200]}"
+            return f"Search error: {error_str}. Please try again."
+        
+        # Step 3: Parse and summarize results (reuse Tavily's logic)
+        if isinstance(result, str):
+            try:
+                import json
+                parsed_result = json.loads(result)
+                if isinstance(parsed_result, dict) and "items" in parsed_result:
+                    return await _summarize_opensearch_results(parsed_result, config)
+            except (json.JSONDecodeError, KeyError):
+                # If parsing fails, return original result
+                pass
+        
+        return result if isinstance(result, str) else str(result)
+    
+    return duckduckgo_search
+
+
+def create_google_search_wrapper(mcp_tool: BaseTool):
+    """Create a wrapper tool for Google MCP tool with auto-injected credentials and summarization.
+    
+    Args:
+        mcp_tool: The Google MCP tool loaded from OpenSearch
+        
+    Returns:
+        A tool function that wraps the MCP tool with credential injection and summarization
+    """
+    @tool(description=GOOGLE_SEARCH_DESCRIPTION)
+    async def google_search(
+        query: str,
+        engine: Annotated[str, InjectedToolArg] = "google",
+        config: RunnableConfig = None
+    ) -> str:
+        """Fetch and summarize search results from Google via MCP.
+        
+        Args:
+            query: Search query string
+            engine: Search engine to use (default: "google")
+            config: Runtime configuration for API keys and model settings
+            
+        Returns:
+            Formatted string containing summarized search results
+        """
+        # Get Google credentials from environment variables
+        api_key = os.getenv("GOOGLE_API_KEY")
+        engine_id = os.getenv("GOOGLE_ENGINE_ID")
+        
+        if not api_key or not engine_id:
+            return "Google search is not configured. Please set GOOGLE_API_KEY and GOOGLE_ENGINE_ID environment variables."
+        
+        # Execute the search via MCP tool with auto-injected credentials
+        try:
+            result = await asyncio.wait_for(
+                mcp_tool.ainvoke({
+                    "query": query,
+                    "engine": engine,
+                    "api_key": api_key,
+                    "engine_id": engine_id
+                }, config),
+                timeout=45.0  # 45 second timeout
+            )
+        except asyncio.TimeoutError:
+            return "Search request timed out after 45 seconds. Please try again with a more specific query."
+        except McpError as e:
+            # Handle MCP errors from OpenSearch plugin
+            error_msg = str(e)
+            if "failed to fetch" in error_msg.lower() or "400" in error_msg.lower():
+                return "Google search encountered an error. This may be due to invalid API credentials, rate limiting, or API configuration issues. Please verify your Google API key and Engine ID are correct."
+            return f"Google search error: {error_msg}. Please try again with a different query."
+        except Exception as e:
+            error_str = str(e)
+            if "closed file" in error_str.lower() or "connection" in error_str.lower():
+                return f"Search request encountered a connection error. Please try again. Error: {error_str[:200]}"
+            return f"Search error: {error_str}. Please try again."
+        
+        # Parse and summarize results (reuse DuckDuckGo's logic)
+        if isinstance(result, str):
+            try:
+                import json
+                parsed_result = json.loads(result)
+                if isinstance(parsed_result, dict) and "items" in parsed_result:
+                    # Limit to top 2 results to save API costs
+                    if isinstance(parsed_result["items"], list):
+                        parsed_result["items"] = parsed_result["items"][:2]
+                    return await _summarize_opensearch_results(parsed_result, config)
+            except (json.JSONDecodeError, KeyError):
+                # If parsing fails, return original result
+                pass
+        
+        return result if isinstance(result, str) else str(result)
+    
+    return google_search
+
+
+async def _load_mcp_tools(config: RunnableConfig) -> List[BaseTool]:
+    """Load tools from MCP server.
+    
+    Args:
+        config: Runtime configuration containing MCP server details
+        
+    Returns:
+        List of available tools from MCP server
+        
+    Raises:
+        ValueError: If MCP is configured but tools cannot be loaded
+    """
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Check if MCP is configured
+    if not configurable.mcp_config or not configurable.mcp_config.url:
+        return []
+    
+    mcp_url = configurable.mcp_config.url
+    
+    # Set up MCP client connection - try both endpoint formats
+    endpoints_to_try = [
+        mcp_url.rstrip("/") + "/_plugins/_ml/mcp",  # OpenSearch ML Commons MCP endpoint
+        mcp_url.rstrip("/") + "/mcp",  # Standard MCP endpoint
+    ]
+    
+    # Always use authentication if credentials are provided
+    auth_headers = None
+    if configurable.mcp_config.username and configurable.mcp_config.password:
+        import base64
+        credentials = f"{configurable.mcp_config.username}:{configurable.mcp_config.password}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        auth_headers = {"Authorization": f"Basic {encoded_credentials}"}
+    elif configurable.mcp_config.auth_required:
+        raise ValueError("MCP auth_required=True but username/password not provided")
+    
+    last_error = None
+    available_tools = None
+    
+    # Try each endpoint format
+    for server_url in endpoints_to_try:
+        try:
+            mcp_server_config = {
+                "opensearch": {
+                    "transport": "streamable_http",
+                    "url": server_url,
+                }
+            }
+            
+            # Add headers if authentication is configured
+            if auth_headers:
+                mcp_server_config["opensearch"]["headers"] = auth_headers
+            
+            # Load tools from MCP server
+            client = MultiServerMCPClient(mcp_server_config)
+            available_tools = await client.get_tools()
+            
+            break  # Success, exit loop
+            
+        except Exception as e:
+            last_error = e
+            continue
+    
+    if available_tools is None:
+        raise ValueError(
+            f"Failed to connect to MCP server at {mcp_url}. "
+            f"Tried endpoints: {endpoints_to_try}. "
+            f"Last error: {last_error}"
+        )
+    
+    return available_tools
+
+
+async def load_duckduckgo_from_mcp(config: RunnableConfig) -> Optional[List[BaseTool]]:
     """Load DuckDuckGo search tool from MCP server.
     
     Args:
         config: Runtime configuration containing MCP server details
         
     Returns:
-        DuckDuckGo tool if available from MCP server, None otherwise
+        List containing DuckDuckGo tool if available from MCP server, None otherwise
+        
+    Raises:
+        ValueError: If MCP is configured but tool cannot be loaded
+    """
+    available_tools = await _load_mcp_tools(config)
+    if not available_tools:
+        return None
+    
+    # Find DuckDuckGo tool - use exact name from OpenSearch config
+    tool_name = 'DuckduckgoWebSearchTool'  # Exact name from OpenSearch registration
+    duckduckgo_tool = next(
+        (tool for tool in available_tools if tool.name == tool_name), 
+        None
+    )
+    
+    if not duckduckgo_tool:
+        return None
+    
+    # Return the raw MCP tool (it will be used internally by duckduckgo_search wrapper)
+    return [duckduckgo_tool]
+
+
+async def load_google_from_mcp(config: RunnableConfig) -> Optional[List[BaseTool]]:
+    """Load Google search tool from MCP server.
+    
+    Args:
+        config: Runtime configuration containing MCP server details
+        
+    Returns:
+        List containing Google tool if available from MCP server, None otherwise
+    """
+    available_tools = await _load_mcp_tools(config)
+    if not available_tools:
+        return None
+    
+    # Find Google tool
+    google_tool = next(
+        (tool for tool in available_tools if tool.name == "GoogleWebSearchTool"), 
+        None
+    )
+    
+    if not google_tool:
+        return None
+    
+    return [google_tool]
+
+
+async def _summarize_opensearch_results(result: dict, config: RunnableConfig) -> str:
+    """Summarize OpenSearch WebSearchTool results using Tavily's summarization logic.
+    
+    Args:
+        result: Parsed JSON result from OpenSearch WebSearchTool (supports DuckDuckGo, Google, etc.)
+        config: Runtime configuration for summarization model
+        
+    Returns:
+        Formatted string with summarized search results
     """
     configurable = Configuration.from_runnable_config(config)
+    items = result.get("items", [])
     
-    # Check if MCP is configured
-    if not configurable.mcp_config or not configurable.mcp_config.url:
+    # Step 1: Extract and deduplicate results by URL (same as Tavily)
+    unique_results = {}
+    for item in items:
+        if item and isinstance(item, dict) and item.get("url"):
+            url = item["url"]
+            if url not in unique_results:
+                unique_results[url] = {
+                    "url": url,
+                    "title": item.get("title", ""),
+                    "raw_content": item.get("content", "")  # Use same key name as Tavily
+                }
+    
+    if not unique_results:
+        return "No valid search results found. Please try different search queries."
+    
+    # Step 2: Set up summarization model (reuse Tavily's logic)
+    max_char_to_include = configurable.max_content_length
+    summarization_model_config = build_model_config(
+        configurable.summarization_model,
+        configurable.summarization_model_max_tokens,
+        config,
+        tags=["langsmith:nostream"]
+    )
+    summarization_model = init_chat_model(
+        **summarization_model_config
+    ).with_structured_output(Summary).with_retry(
+        stop_after_attempt=configurable.max_structured_output_retries
+    )
+    
+    # Step 3: Create summarization tasks (reuse Tavily's pattern)
+    async def noop():
+        """No-op function for results without raw content."""
         return None
     
-    try:
-        # Set up MCP client connection
-        server_url = configurable.mcp_config.url.rstrip("/") + "/_plugins/_ml/mcp"
-        
-        mcp_server_config = {
-            "opensearch": {
-                "transport": "streamable_http",
-                "url": server_url,
-            }
-        }
-        
-        # Load tools from MCP server
-        client = MultiServerMCPClient(mcp_server_config)
-        available_tools = await client.get_tools()
-        
-        # Find DuckDuckGo tool
-        duckduckgo_tool = next(
-            (tool for tool in available_tools if tool.name == 'DuckduckgoWebSearchTool'), 
-            None
+    summarization_tasks = [
+        noop() if not result.get("raw_content")
+        else summarize_webpage(
+            summarization_model,
+            result["raw_content"][:max_char_to_include]
         )
-        
-        if duckduckgo_tool:
-            logging.info("Successfully loaded DuckDuckGo tool from MCP server")
-            search_tool = duckduckgo_tool
-            search_tool.metadata = {
-                **(search_tool.metadata or {}), 
-                "type": "search", 
-                "name": "web_search"
-            }
-            return [search_tool]
-        else:
-            logging.warning("DuckDuckGo tool not found in MCP server tools")
-            return None
-            
-    except Exception as e:
-        logging.warning(f"Failed to load DuckDuckGo from MCP server: {e}")
-        return None
+        for result in unique_results.values()
+    ]
+    
+    # Step 4: Execute all summarization tasks in parallel (reuse Tavily's pattern)
+    summaries = await asyncio.gather(*summarization_tasks)
+    
+    # Step 5: Combine results with their summaries (reuse Tavily's pattern)
+    summarized_results = {
+        url: {
+            "title": result["title"] or "Untitled",
+            "content": result["raw_content"] if summary is None else summary
+        }
+        for url, result, summary in zip(
+            unique_results.keys(),
+            unique_results.values(),
+            summaries
+        )
+    }
+    
+    # Step 6: Format the final output (reuse Tavily's formatting)
+    if not summarized_results:
+        return "No valid search results found. Please try different search queries or use a different search API."
+    
+    formatted_output = "Search results: \n\n"
+    for i, (url, result_data) in enumerate(summarized_results.items()):
+        formatted_output += f"\n\n--- SOURCE {i+1}: {result_data['title']} ---\n"
+        formatted_output += f"URL: {url}\n\n"
+        formatted_output += f"SUMMARY:\n{result_data['content']}\n\n"
+        formatted_output += "\n\n" + "-" * 80 + "\n"
+    
+    return formatted_output
 
+##########################
+# Tool Utils
+##########################
 
 async def get_search_tool(search_api: SearchAPI):
     """Configure and return search tools based on the specified API provider.
@@ -653,12 +964,23 @@ async def get_all_tools(config: RunnableConfig):
     # Add configured search tools
     configurable = Configuration.from_runnable_config(config)
 
-    duckduckgo_tool = await load_duckduckgo_from_mcp(config)
+    # Check if Google MCP tool is available
+    google_mcp_tools = await load_google_from_mcp(config)
+    if google_mcp_tools:
+        # Create wrapper tool that handles credential injection and summarization
+        google_mcp_tool = google_mcp_tools[0]
+        google_wrapper = create_google_search_wrapper(google_mcp_tool)
+        # Set the tool name to match what the LLM expects
+        google_wrapper.name = "WebSearchTool"
+        google_wrapper.metadata = {
+            **(google_wrapper.metadata or {}),
+            "type": "search"
+        }
+        tools.append(google_wrapper)
 
     search_api = SearchAPI(get_config_value(configurable.search_api))
     # search_tools = await get_search_tool(search_api)
     # tools.extend(search_tools)
-    tools.extend(duckduckgo_tool)
     
     # Track existing tool names to prevent conflicts
     existing_tool_names = {

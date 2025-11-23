@@ -438,7 +438,7 @@ async def researcher_tools(state: ResearcherState, config: RunnableConfig) -> Co
     
     This function handles various types of researcher tool calls:
     1. think_tool - Strategic reflection that continues the research conversation
-    2. Search tools (tavily_search, web_search) - Information gathering
+    2. Search tools (WebSearchTool) - Information gathering via MCP
     3. MCP tools - External tool integrations
     4. ResearchComplete - Signals completion of individual research task
     
@@ -466,6 +466,7 @@ async def researcher_tools(state: ResearcherState, config: RunnableConfig) -> Co
     
     # Step 2: Handle other tool calls (search, MCP tools, etc.)
     tools = await get_all_tools(config)
+    
     tools_by_name = {
         tool.name if hasattr(tool, "name") else tool.get("name", "web_search"): tool 
         for tool in tools
