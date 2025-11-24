@@ -126,6 +126,7 @@ def get_product_recommendations(runtime: ToolRuntime, max_results: int = 5) -> l
     """
     Get personalized product recommendations based on customer's preferences from their memory profile.
     Uses hybrid search combining neural semantic search with keyword matching for best results.
+    Automatically filters by favorite colors, sizes, style preferences, and interests when available.
 
     Args:
         max_results: Maximum number of recommendations (default: 5)
@@ -140,35 +141,56 @@ def get_product_recommendations(runtime: ToolRuntime, max_results: int = 5) -> l
     index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
 
     # If no preferences, return promoted products
-    if not loaded_memory or loaded_memory.strip() == "":
+    if not loaded_memory or loaded_memory.strip() == "" or loaded_memory == "No preferences stored yet":
         return filter_products_by_category_and_price.invoke(
             {"runtime": runtime, "promoted_only": True, "max_results": max_results}
         )
 
-    # Hybrid search: Neural + BM25 for better relevance
+    # Parse preferences from loaded_memory to build smarter filters
+    color_boost_query = None
+    if "Favorite Colors:" in loaded_memory:
+        # Extract colors and boost products containing those colors in name/description
+        colors_line = [line for line in loaded_memory.split('\n') if 'Favorite Colors:' in line]
+        if colors_line:
+            colors = colors_line[0].replace('Favorite Colors:', '').strip()
+            color_boost_query = {
+                "multi_match": {
+                    "query": colors,
+                    "fields": ["name^3", "description^2", "color"],
+                    "boost": 2.0  # Strong boost for color matches
+                }
+            }
+
+    # Build hybrid search: Neural + BM25 + Color preference boost
+    should_clauses = [
+        {
+            "neural": {
+                "product_vector": {
+                    "query_text": loaded_memory,
+                    "model_id": model_id,
+                    "k": max_results * 3
+                }
+            }
+        },
+        {
+            "multi_match": {
+                "query": loaded_memory,
+                "fields": ["name^2", "description", "category"],
+                "type": "best_fields",
+                "boost": 0.5  # Neural search gets more weight
+            }
+        }
+    ]
+
+    # Add color boost if preferences include colors
+    if color_boost_query:
+        should_clauses.append(color_boost_query)
+
     search_body = {
         "size": max_results,
         "query": {
             "bool": {
-                "should": [
-                    {
-                        "neural": {
-                            "product_vector": {
-                                "query_text": loaded_memory,
-                                "model_id": model_id,
-                                "k": max_results * 3
-                            }
-                        }
-                    },
-                    {
-                        "multi_match": {
-                            "query": loaded_memory,
-                            "fields": ["name^2", "description", "category"],
-                            "type": "best_fields",
-                            "boost": 0.5  # Neural search gets more weight
-                        }
-                    }
-                ],
+                "should": should_clauses,
                 "filter": [
                     {"range": {"current_stock": {"gt": 0}}}
                 ],
@@ -192,6 +214,109 @@ def get_product_recommendations(runtime: ToolRuntime, max_results: int = 5) -> l
         return products
     except Exception as e:
         return [{"error": f"Recommendations failed: {str(e)}"}]
+
+
+@tool
+def search_products_by_preferences(
+    runtime: ToolRuntime,
+    colors: str = None,
+    style: str = None,
+    category: str = None,
+    max_results: int = 10
+) -> list[dict]:
+    """
+    Search products by specific preferences like color, style, and category.
+    Use this when the customer explicitly mentions they want products in specific colors or styles.
+    This tool performs semantic search weighted by the specified preferences.
+
+    Args:
+        colors: Preferred colors (e.g., "blue", "black and red", "navy")
+        style: Style preference (e.g., "casual", "formal", "athletic", "vintage")
+        category: Product category (e.g., "apparel", "footwear", "accessories")
+        max_results: Maximum number of products to return (default: 10)
+
+    Returns:
+        list[dict]: List of matching products with relevance scores
+    """
+    client = get_opensearch_client()
+    model_id = os.getenv('OPENSEARCH_MODEL_ID')
+    index_name = os.getenv('OPENSEARCH_INDEX_PRODUCTS', 'shopping_products')
+
+    # Build search query from preferences
+    query_parts = []
+    if colors:
+        query_parts.append(f"{colors} colored")
+    if style:
+        query_parts.append(f"{style} style")
+    if category:
+        query_parts.append(category)
+
+    search_query = " ".join(query_parts) if query_parts else "featured products"
+
+    # Build OpenSearch query with preference boosting
+    should_clauses = [
+        {
+            "neural": {
+                "product_vector": {
+                    "query_text": search_query,
+                    "model_id": model_id,
+                    "k": max_results * 2
+                }
+            }
+        }
+    ]
+
+    # Add specific color matching with high boost
+    if colors:
+        should_clauses.append({
+            "multi_match": {
+                "query": colors,
+                "fields": ["name^4", "description^3", "color^5"],
+                "boost": 3.0
+            }
+        })
+
+    # Add style matching
+    if style:
+        should_clauses.append({
+            "multi_match": {
+                "query": style,
+                "fields": ["name^2", "description^2", "category"],
+                "boost": 1.5
+            }
+        })
+
+    # Filter by category if specified
+    filters = [{"range": {"current_stock": {"gt": 0}}}]
+    if category:
+        filters.append({"term": {"category": category.lower()}})
+
+    search_body = {
+        "size": max_results,
+        "query": {
+            "bool": {
+                "should": should_clauses,
+                "filter": filters,
+                "minimum_should_match": 1
+            }
+        },
+        "_source": {
+            "excludes": ["product_vector"]
+        }
+    }
+
+    try:
+        response = client.search(index=index_name, body=search_body)
+
+        products = []
+        for hit in response['hits']['hits']:
+            product = hit['_source']
+            product['relevance_score'] = round(hit['_score'], 2)
+            products.append(product)
+
+        return products
+    except Exception as e:
+        return [{"error": f"Preference search failed: {str(e)}"}]
 
 
 @tool
@@ -225,6 +350,7 @@ opensearch_tools = [
     search_products_by_query,
     filter_products_by_category_and_price,
     get_product_recommendations,
+    search_products_by_preferences,
     get_product_by_id
 ]
 
