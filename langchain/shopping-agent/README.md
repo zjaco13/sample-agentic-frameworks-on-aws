@@ -33,12 +33,13 @@ An intelligent shopping assistant powered by **LangGraph**, **OpenAI**, and **Op
 git clone <repository-url>
 cd langchain/shopping-agent
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
 # Install dependencies
 uv sync
+
+# activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+
 ```
 
 ### 2. Configure Environment
