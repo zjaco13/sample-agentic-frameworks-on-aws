@@ -49,7 +49,7 @@ def create_memory_container(client, embedding_model_id: str, llm_model_id: str =
             "embedding_dimension": 768,  # msmarco-distilbert embedding dimension
             "strategies": [
                 {
-                    "type": "SEMANTIC",
+                    "type": "USER_PREFERENCE",
                     "namespace": ["customer_id"]
                 }
             ],
