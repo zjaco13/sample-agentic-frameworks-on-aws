@@ -49,7 +49,20 @@ def supervisor_router(state: State) -> dict:
     Implements fast-path routing for obvious queries to reduce LLM overhead.
     """
     messages = state["messages"]
-    last_message = messages[-1].content.lower() if messages else ""
+    
+    last_message = ""
+    if messages:
+        content = messages[-1].content
+        if isinstance(content, str):
+            last_message = content.lower()
+        elif isinstance(content, list) and content:
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    last_message = item.get("text", "").lower()
+                    break
+                elif isinstance(item, str):
+                    last_message = item.lower()
+                    break
 
     # FAST PATH: Skip LLM for obvious product search queries
     product_keywords = [

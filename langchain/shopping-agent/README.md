@@ -20,7 +20,7 @@ An intelligent shopping assistant powered by **LangGraph**, **OpenAI**, and **Op
 
 ## 📋 Prerequisites
 
-- Python 3.11+
+- Python 3.13+
 - Docker (for OpenSearch)
 - OpenAI API key
 - 4GB RAM minimum
@@ -38,8 +38,6 @@ uv sync
 
 # activate virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-
 ```
 
 ### 2. Configure Environment
