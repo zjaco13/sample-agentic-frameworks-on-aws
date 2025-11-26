@@ -52,7 +52,33 @@ def create_memory_container(client, embedding_model_id: str, llm_model_id: str =
                     "type": "USER_PREFERENCE",
                     "namespace": ["customer_id"]
                 }
-            ]
+            ],
+            "index_settings": {
+                "session_index": {
+                    "index": {
+                    "number_of_shards": "1",
+                    "auto_expand_replicas": "0-all"
+                    }
+                },
+                "working_memory_index": {
+                    "index": {
+                    "number_of_shards": "1",
+                    "auto_expand_replicas": "0-all"
+                    }
+                },
+                "long_term_memory_index": {
+                    "index": {
+                    "number_of_shards": "1",
+                    "auto_expand_replicas": "0-all"
+                    }
+                },
+                "long_term_memory_history_index": {
+                    "index": {
+                    "number_of_shards": "1",
+                    "auto_expand_replicas": "0-all"
+                    }
+                }
+            }
         }
     }
 
